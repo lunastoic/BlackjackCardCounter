@@ -116,6 +116,7 @@ struct DealNextHandButtons: View {
     @ObservedObject var gameState: BlackjackGameState
     let gameEngine: BlackjackGameEngine
     let bettingManager: BlackjackBettingManager
+    var animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
     
     var body: some View {
         if gameState.lastBet != nil && gameState.resultMessage != nil {
@@ -135,7 +136,16 @@ struct DealNextHandButtons: View {
                 .disabled(!bettingManager.canRedoBet(gameState: gameState))
                 
                 Button(action: {
-                    gameEngine.dealInitialCards(gameState: gameState)
+                    if gameState.isDealing { return }
+                    gameState.isDealing = true // Lock UI immediately to prevent double deal
+                    
+                    // Check if we're in RegularModeView (deck position is set)
+                    let useRegularAnimation = gameState.deckPosition != .zero
+                    gameEngine.dealInitialCards(
+                        gameState: gameState, 
+                        useRegularModeAnimation: useRegularAnimation,
+                        animationCallback: animationCallback
+                    )
                 }) {
                     Text("Deal Cards")
                         .font(.title3)
@@ -150,25 +160,31 @@ struct DealNextHandButtons: View {
             }
             .frame(maxWidth: 440)
             .padding(.horizontal)
-        } else {
+        } else if !gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty {
             Button(action: {
-                if gameState.showNextHand {
-                    gameEngine.dealNewHand(gameState: gameState)
-                } else {
-                    gameEngine.dealInitialCards(gameState: gameState)
-                }
+                if gameState.isDealing { return }
+                gameState.isDealing = true // Lock UI immediately to prevent double deal
+                
+                // Check if we're in RegularModeView (deck position is set)
+                let useRegularAnimation = gameState.deckPosition != .zero
+                gameEngine.dealInitialCards(
+                    gameState: gameState, 
+                    useRegularModeAnimation: useRegularAnimation,
+                    animationCallback: animationCallback
+                )
             }) {
-                Text(gameState.showNextHand ? "Next Hand" : "Deal Cards")
-                    .font(.title2)
+                Text("Deal Cards")
+                    .font(.title3)
                     .fontWeight(.bold)
-                    .padding()
                     .frame(maxWidth: .infinity)
-                    .background(gameState.playerBet > 0 || gameState.showNextHand ? Color(hex: "38b802") : Color.gray)
+                    .padding()
+                    .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
             }
+            .disabled(gameState.playerBet == 0)
+            .frame(maxWidth: 440)
             .padding(.horizontal)
-            .disabled(gameState.playerBet == 0 && !gameState.showNextHand)
         }
     }
 }

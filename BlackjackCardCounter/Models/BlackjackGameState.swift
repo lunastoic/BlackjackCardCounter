@@ -6,6 +6,7 @@ class BlackjackGameState: ObservableObject {
     @Published var deck: [Card] = []
     @Published var playerHand: [Card] = []
     @Published var dealerHand: [Card] = []
+    @Published var visuallyRevealedDealerHand: [Card] = [] // Only cards that are visually flipped
     @Published var splitHands: [[Card]] = []
     @Published var activeHandIndex: Int = 0
     @Published var isSplit: Bool = false
@@ -77,6 +78,7 @@ class BlackjackGameState: ObservableObject {
         deck = []
         playerHand = []
         dealerHand = []
+        visuallyRevealedDealerHand = []
         splitHands = []
         activeHandIndex = 0
         isSplit = false
@@ -117,6 +119,7 @@ class BlackjackGameState: ObservableObject {
     func resetForNewHand() {
         playerHand = []
         dealerHand = []
+        visuallyRevealedDealerHand = []
         showNextHand = false
         playerBet = 0
         betChips = []

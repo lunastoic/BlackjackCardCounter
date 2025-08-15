@@ -27,18 +27,27 @@ struct ZeroChipsOverlay: View {
                 Text("You need chips to play!")
                     .foregroundColor(.white.opacity(0.8))
                 
-                if canClaimReward {
-                    NavigationLink(destination: RewardsView()) {
-                        Text("Get Free Chips")
+                if true {
+                    Button(action: {
+                        if canClaimReward {
+                            XPChipManager.shared.updateChips(500)
+                            lastDailyRewardDate = Date().timeIntervalSince1970
+                            isPresented = false
+                        }
+                    }) {
+                        Text(canClaimReward ? "Get Free Chips" : "Free Chips Unavailable")
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding(.horizontal, 30)
                             .padding(.vertical, 12)
-                            .background(Color.yellow)
+                            .background(canClaimReward ? Color.yellow : Color.gray)
                             .cornerRadius(25)
                     }
-                } else {
-                    Text("Come back in 24 hours for more chips!")
+                }
+                if !canClaimReward {
+                    let now = Date().timeIntervalSince1970
+                    let hoursLeft = max(0, 24 - Int((now - lastDailyRewardDate) / 3600))
+                    Text("Come back in \(hoursLeft) hour\(hoursLeft == 1 ? "" : "s") for more chips!")
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)

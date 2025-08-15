@@ -61,7 +61,7 @@ enum ChipDenomination: Int, CaseIterable {
     }
 }
 
-struct Card: Identifiable {
+struct Card: Identifiable, Equatable {
     let id = UUID()
     let suit: CardSuit
     let rank: CardRank
@@ -96,6 +96,10 @@ struct Card: Identifiable {
     
     var countValue: Int {
         rank.countValue
+    }
+    
+    static func == (lhs: Card, rhs: Card) -> Bool {
+        lhs.id == rhs.id && lhs.suit == rhs.suit && lhs.rank == rhs.rank && lhs.isFaceUp == rhs.isFaceUp
     }
 }
 

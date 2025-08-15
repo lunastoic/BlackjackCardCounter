@@ -99,11 +99,13 @@ struct QuizModeView: View {
     @State private var isCorrect: Bool = false
     @State private var progressCircles: Int = 0
     @State private var showCards: Bool = false
-    @State private var cardDisplayTime: Double = 1.5
+    @State private var cardDisplayTime: Double = 0.8
     @State private var isShowingResult: Bool = false
     @State private var currentCardIndex: Int = 0
     @State private var answerOptions: [Int] = []
     @State private var correctAnswerIndex: Int = 0
+    @State private var showClaimReward: Bool = false
+    @State private var isQuizInSession: Bool = false
     
     var body: some View {
         ZStack {
@@ -135,7 +137,7 @@ struct QuizModeView: View {
                     HStack(spacing: 8) {
                         ForEach(0..<9, id: \.self) { index in
                             Circle()
-                                .fill(index < progressCircles ? Color.green : Color.gray.opacity(0.3))
+                                .fill(index < progressCircles ? Color(hex: "FFD700") : Color.gray.opacity(0.3))
                                 .frame(width: 20, height: 20)
                                 .overlay(
                                     Circle()
@@ -150,6 +152,35 @@ struct QuizModeView: View {
                 }
                 .padding()
                 
+                // Claim Reward Button
+                if showClaimReward {
+                    Button(action: {
+                        claimReward()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "gift.fill")
+                                .font(.title2)
+                            Text("Claim Reward")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(hex: "FFD700"), Color(hex: "FFA500")]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(12)
+                        .shadow(color: Color(hex: "FFD700").opacity(0.5), radius: 8, x: 0, y: 4)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showClaimReward)
+                }
+                
                 Spacer()
                 
                 // Single card display area
@@ -161,22 +192,18 @@ struct QuizModeView: View {
                                 .aspectRatio(0.7, contentMode: .fit)
                                 .frame(width: 120, height: 180)
                                 .shadow(radius: 5)
-                                .transition(.opacity.combined(with: .scale))
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                             
                             Text("Card \(currentCardIndex + 1) of \(currentCards.count)")
                                 .font(.headline)
                                 .foregroundColor(.white)
                         }
-                    } else if !showCards && !currentCards.isEmpty {
-                        Text("Cards shown!")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.yellow)
-                            .frame(height: 180)
                     } else {
-                        Text("Cards will appear here")
-                            .font(.headline)
-                            .foregroundColor(.gray)
+                        // Empty space when no cards are shown
+                        Color.clear
                             .frame(height: 180)
                     }
                 }
@@ -242,7 +269,7 @@ struct QuizModeView: View {
                 .padding()
                 
                 // Start button
-                if !showCards && !showAnswer && !isShowingResult {
+                if !isQuizInSession && !showCards && !showAnswer && !isShowingResult && !showClaimReward {
                     Button("Start Quiz") {
                         startQuiz()
                     }
@@ -283,6 +310,7 @@ struct QuizModeView: View {
     }
     
     private func startQuiz() {
+        isQuizInSession = true
         generateNewQuestion()
     }
     
@@ -332,17 +360,17 @@ struct QuizModeView: View {
     
     private func showNextCard() {
         if currentCardIndex < currentCards.count {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.easeInOut(duration: 0.2)) {
                 showCards = true
             }
             
             // Show card for display time
             DispatchQueue.main.asyncAfter(deadline: .now() + cardDisplayTime) {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     showCards = false
                 }
                 
-                // Move to next card after a brief pause
+                // Wait for card to fully disappear before showing next card
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     currentCardIndex += 1
                     showNextCard()
@@ -350,7 +378,7 @@ struct QuizModeView: View {
             }
         } else {
             // All cards shown, show answer options
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showAnswer = true
                 }
@@ -368,17 +396,33 @@ struct QuizModeView: View {
             // Increment progress
             progressCircles += 1
             if progressCircles >= 9 {
-                // Quiz completed
-                progressCircles = 0
+                // Quiz completed - show claim reward button
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    showClaimReward = true
+                }
             }
         } else {
             // Reset progress on wrong answer
             progressCircles = 0
+            showClaimReward = false
+            isQuizInSession = false
         }
         
         withAnimation(.easeInOut(duration: 0.3)) {
             showAnswer = false
             isShowingResult = true
+        }
+    }
+    
+    private func claimReward() {
+        // Give user 250 chips
+        XPChipManager.shared.updateChips(250)
+        
+        // Reset progress and hide claim reward button
+        withAnimation(.easeInOut(duration: 0.3)) {
+            progressCircles = 0
+            showClaimReward = false
+            isQuizInSession = false
         }
     }
     

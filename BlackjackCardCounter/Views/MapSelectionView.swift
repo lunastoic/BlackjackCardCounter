@@ -7,10 +7,10 @@ struct MapSelectionView: View {
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // comma-separated IDs, 1 is always unlocked
     
     let maps: [Map] = [
-        Map(id: 1, name: "Luna Luxe Casino", imageName: "LunaLuxe", isLocked: false, requiredLevel: 1),
-        Map(id: 2, name: "Io Inferno Lounge", imageName: "Infernoo", isLocked: false, requiredLevel: 5),
-        Map(id: 3, name: "Europa Ice Palace", imageName: "Europaa", isLocked: false, requiredLevel: 10),
-        Map(id: 4, name: "Ganymede Grand", imageName: "GanymedeGrand", isLocked: false, requiredLevel: 15),
+        Map(id: 1, name: "Luna Luxe Casino", imageName: "RealLunaLuxe", isLocked: false, requiredLevel: 1),
+        Map(id: 2, name: "Io Inferno Lounge", imageName: "RealLounge", isLocked: false, requiredLevel: 5),
+        Map(id: 3, name: "Europa Ice Palace", imageName: "RealEuropa", isLocked: false, requiredLevel: 10),
+        Map(id: 4, name: "Ganymede Grand", imageName: "Ganymede", isLocked: false, requiredLevel: 15),
         Map(id: 5, name: "Titan Methane Mirage", imageName: "TitanMethane", isLocked: false, requiredLevel: 20),
         Map(id: 6, name: "Kelper Fortune", imageName: "KelperFortune", isLocked: false, requiredLevel: 25)
     ]
@@ -128,9 +128,10 @@ struct MapCard: View {
                     .animation(.easeInOut(duration: 0.5), value: isUnlocking)
                 VStack(spacing: 10) {
                     Spacer()
-                    Image(systemName: "lock.fill")
-                        .font(.largeTitle)
-                        .foregroundColor(.white.opacity(0.7))
+                    Image("LockedLock")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 162, height: 162)
                         .opacity(isUnlocking ? 0 : 1)
                         .scaleEffect(isUnlocking ? 2 : 1)
                         .animation(.easeInOut(duration: 0.5), value: isUnlocking)
@@ -178,7 +179,7 @@ struct MapCard: View {
                     }
                     .frame(height: 170)
                     Spacer(minLength: 40)
-                    if unlocked && isSelected {
+                    if unlocked {
                         if map.name == "Luna Luxe Casino" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
@@ -193,6 +194,9 @@ struct MapCard: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
                         } else if map.name == "Io Inferno Lounge" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
@@ -228,6 +232,9 @@ struct MapCard: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
                         } else if map.name == "Europa Ice Palace" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
@@ -263,6 +270,117 @@ struct MapCard: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+                        } else if map.name == "Ganymede Grand" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Training Mode",
+                                        description: "Learn with visuals and tutorials",
+                                        systemImage: "book.fill",
+                                        color: Color.purple
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Regular Mode",
+                                        description: "Classic casino experience",
+                                        systemImage: "play.fill",
+                                        color: Color.purple
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Quiz Mode",
+                                        description: "Test your knowledge",
+                                        systemImage: "questionmark.circle.fill",
+                                        color: Color.purple
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+                        } else if map.name == "Titan Methane Mirage" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Training Mode",
+                                        description: "Learn with visuals and tutorials",
+                                        systemImage: "book.fill",
+                                        color: Color.green
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Regular Mode",
+                                        description: "Classic casino experience",
+                                        systemImage: "play.fill",
+                                        color: Color.green
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    LiquidGlassGameModeButton(
+                                        title: "Quiz Mode",
+                                        description: "Test your knowledge",
+                                        systemImage: "questionmark.circle.fill",
+                                        color: Color.green
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+                        } else if map.name == "Europa Ice Palace" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
+                                    NeonGameModeButton(
+                                        title: "Training Mode",
+                                        description: "Learn with visuals and tutorials",
+                                        systemImage: "book.fill",
+                                        gradient: Gradient(colors: [Color(hex: "007AFF").opacity(0.85), Color(hex: "007AFF").opacity(0.65)]),
+                                        iconColor: Color(hex: "007AFF")
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    NeonGameModeButton(
+                                        title: "Regular Mode",
+                                        description: "Classic casino experience",
+                                        systemImage: "play.fill",
+                                        gradient: Gradient(colors: [Color(hex: "007AFF").opacity(0.85), Color(hex: "007AFF").opacity(0.65)]),
+                                        iconColor: Color(hex: "007AFF")
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    NeonGameModeButton(
+                                        title: "Quiz Mode",
+                                        description: "Test your knowledge",
+                                        systemImage: "questionmark.circle.fill",
+                                        gradient: Gradient(colors: [Color(hex: "007AFF").opacity(0.85), Color(hex: "007AFF").opacity(0.65)]),
+                                        iconColor: Color(hex: "007AFF")
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
                         } else {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
@@ -298,6 +416,9 @@ struct MapCard: View {
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
+                            .opacity(isSelected ? 1.0 : 0.0)
+                            .scaleEffect(isSelected ? 1.0 : 0.8)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
                         }
                     }
                 }
@@ -307,12 +428,18 @@ struct MapCard: View {
                         .fill(Color.black.opacity(0.5))
                     VStack(spacing: 10) {
                         Spacer()
-                        Image(systemName: "lock.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(.white.opacity(0.7))
+                        Image("LockedLock")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 162, height: 162)
+                        Text(map.name)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
                         Text("Unlocks at Level \(map.requiredLevel)")
                             .foregroundColor(.white.opacity(0.7))
-                            .font(.headline)
+                            .font(.subheadline)
                         Spacer()
                     }
                 }
@@ -379,6 +506,98 @@ struct NeonGameModeButton: View {
                 .shadow(color: iconColor.opacity(0.7), radius: 8, x: 0, y: 0)
         )
         .shadow(color: iconColor.opacity(0.4), radius: 12, x: 0, y: 0)
+    }
+}
+
+struct LiquidGlassGameModeButton: View {
+    let title: String
+    let description: String
+    let systemImage: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundColor(.white)
+                .font(.title3.bold())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(
+            ZStack {
+                // Base glass background
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                color.opacity(0.15),
+                                color.opacity(0.08)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                // Glass blur effect
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .blendMode(.overlay)
+                
+                // Subtle inner glow
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                color.opacity(0.3),
+                                color.opacity(0.1)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                
+                // Highlight for glass effect
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.white.opacity(0.2),
+                                Color.clear
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+                    .blendMode(.overlay)
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            color.opacity(0.4),
+                            color.opacity(0.2)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
     }
 }
 

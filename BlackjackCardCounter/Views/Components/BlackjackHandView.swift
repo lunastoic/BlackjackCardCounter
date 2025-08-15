@@ -29,7 +29,7 @@ struct DealerHandView: View {
                 Text("Dealer")
                     .font(.headline)
                     .foregroundColor(.white)
-                Text("(\(gameState.isPlayerTurn ? String(gameEngine.handValue([gameState.dealerHand.first].compactMap { $0 })) : gameEngine.getHandValueText(gameState.dealerHand)))")
+                Text(gameState.isPlayerTurn ? String(gameEngine.handValue([gameState.dealerHand.first].compactMap { $0 })) : gameEngine.getHandValueText(gameState.dealerHand))
                     .font(.subheadline)
                     .foregroundColor(.yellow)
             }
@@ -66,7 +66,7 @@ struct PlayerHandView: View {
                 Text("Player")
                     .font(.headline)
                     .foregroundColor(.white)
-                Text("(\(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand)))")
+                Text(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand))
                     .font(.subheadline)
                     .foregroundColor(.yellow)
             }
@@ -110,7 +110,7 @@ struct SplitHandsView: View {
                         Text("Hand \(idx + 1)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
                             .font(.caption)
                             .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
-                        Text("(\(gameEngine.getHandValueText(gameState.splitHands[idx])))")
+                        Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
                             .font(.caption)
                             .foregroundColor(.yellow)
                     }
@@ -139,7 +139,8 @@ struct FlipCardView: View {
     
     var body: some View {
         ZStack {
-            if cardUnderglow && glowColor != .clear {
+            // Only show underglow when card is flipped (face-up)
+            if cardUnderglow && isFlipped && glowColor != .clear {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(glowColor)
                     .frame(width: glowWidth, height: 98)
@@ -154,7 +155,6 @@ struct FlipCardView: View {
                     .aspectRatio(0.7, contentMode: .fit)
                     .frame(width: width, height: 90)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 3)
                     .opacity(isFlipped ? 1.0 : 0.0)
                 
                 // Deck cover (shown when not flipped)
@@ -162,7 +162,7 @@ struct FlipCardView: View {
                     .resizable()
                     .aspectRatio(0.7, contentMode: .fit)
                     .frame(width: width, height: 90)
-                    .shadow(radius: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .opacity(isFlipped ? 0.0 : 1.0)
             }
             .rotation3DEffect(
@@ -171,6 +171,7 @@ struct FlipCardView: View {
             )
             .animation(.easeInOut(duration: 0.6), value: isFlipped)
         }
+        .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
     }
     
     // Calculate the card image name based on flip state
@@ -248,7 +249,6 @@ struct CardView: View {
                     .aspectRatio(0.7, contentMode: .fit)
                     .frame(width: width, height: 90)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 3)
                     .onAppear {
                         // Check if image exists
                         if UIImage(named: card.imageName) == nil {
@@ -258,6 +258,7 @@ struct CardView: View {
                     }
             }
         }
+        .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
         .offset(y: appeared ? 0 : -250)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.4), value: appeared)

@@ -21,23 +21,50 @@ struct TrainingModeView: View {
     
     var body: some View {
         ZStack {
-            // Arch text as background
-            GeometryReader { geo in
-                Text("Dealer must hit on soft 17")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white.opacity(0.25))
-                    .modifier(ArchTextModifier(width: geo.size.width * 0.8, height: 200))
-                    .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
-                    .zIndex(-1)
-            }
-            .ignoresSafeArea()
-            
+            // Background gradient - ensure it covers the entire screen
             LinearGradient(
                 gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .ignoresSafeArea()
+            .ignoresSafeArea(.all, edges: .all)
+            
+            // Background text - arched like a rainbow (behind everything)
+            GeometryReader { geo in
+                ZStack {
+                    // "Luna Luxe Casino" - top arc
+                    createArchedText(
+                        text: "Luna Luxe Casino",
+                        fontSize: 36,
+                        width: geo.size.width * 0.8,
+                        height: 80,
+                        centerX: geo.size.width / 2,
+                        centerY: geo.size.height / 2 - 125
+                    )
+                    
+                    // "Blackjack pays 3 to 2" - middle arc
+                    createArchedText(
+                        text: "Blackjack pays 3 to 2",
+                        fontSize: 24,
+                        width: geo.size.width * 0.7,
+                        height: 60,
+                        centerX: geo.size.width / 2,
+                        centerY: geo.size.height / 2 - 95
+                    )
+                    
+                    // "Dealer must hit on soft 17" - bottom arc
+                    createArchedText(
+                        text: "Dealer must hit on soft 17",
+                        fontSize: 16,
+                        width: geo.size.width * 0.75,
+                        height: 50,
+                        centerX: geo.size.width / 2,
+                        centerY: geo.size.height / 2 - 65
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+            .zIndex(0)
             
             VStack(spacing: 0) {
                 // Game Header
@@ -111,6 +138,11 @@ struct TrainingModeView: View {
                 
                 Spacer().frame(height: 8)
                 
+                // iPhone-specific spacing above player cards
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    Spacer().frame(height: 15)
+                }
+                
                 // Player and Dealer cards area
                 GeometryReader { geo in
                     let maxPlayerCards = max(gameState.dealtPlayerCards.count, gameState.isSplit ? gameState.splitHands.flatMap { $0 }.count : 2)
@@ -125,7 +157,7 @@ struct TrainingModeView: View {
                                 Text("Dealer")
                                     .font(.headline)
                                     .foregroundColor(.white)
-                                Text("(\(dealerValueLabel()))")
+                                Text(dealerValueLabel())
                                     .font(.subheadline)
                                     .foregroundColor(.yellow)
                             }
@@ -144,8 +176,10 @@ struct TrainingModeView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .center)
                         }
+                        .offset(y: UIDevice.current.userInterfaceIdiom == .phone ? -15 : 0)
                         
-                        Spacer().frame(height: 8)
+                        // Spacing between dealer and player - 5 points more on iPhone
+                        Spacer().frame(height: UIDevice.current.userInterfaceIdiom == .phone ? 13 : 8)
                         
                         // Player cards
                         VStack(spacing: 8) {
@@ -153,7 +187,7 @@ struct TrainingModeView: View {
                                 Text("Player")
                                     .font(.headline)
                                     .foregroundColor(.white)
-                                Text("(\(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand)))")
+                                Text(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand))
                                     .font(.subheadline)
                                     .foregroundColor(.yellow)
                             }
@@ -166,7 +200,7 @@ struct TrainingModeView: View {
                                                 Text("Hand \(idx + 1)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
                                                     .font(.caption)
                                                     .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
-                                                Text("(\(gameEngine.getHandValueText(gameState.splitHands[idx])))")
+                                                Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
                                                     .font(.caption)
                                                     .foregroundColor(.yellow)
                                             }
@@ -195,6 +229,11 @@ struct TrainingModeView: View {
                         }
                         .frame(height: 240)
                         
+                        // iPad-specific spacing above action buttons
+                        if UIDevice.current.userInterfaceIdiom == .pad {
+                            Spacer().frame(height: 250)
+                        }
+                        
                         // Show result message after round
                         if gameState.showNextHand && gameState.isPlayerTurn {
                             BlackjackActionButtons(
@@ -218,6 +257,7 @@ struct TrainingModeView: View {
                             bettingManager: bettingManager,
                             gameEngine: gameEngine
                         )
+                        .disabled(gameState.isDealing)
                         
                         // Chips at the bottom (always visible before a hand is dealt or after a round is over)
                         if !gameState.showNextHand {
@@ -225,6 +265,7 @@ struct TrainingModeView: View {
                                 gameState: gameState,
                                 bettingManager: bettingManager
                             )
+                            .disabled(gameState.isDealing)
                         }
                         
                         // Deal/Next Hand Button at the very bottom
@@ -266,11 +307,11 @@ struct TrainingModeView: View {
                             .shadow(radius: 6)
                     }
                     .padding(.trailing, 8)
-                    .offset(y: -150)
+                    .offset(y: -230)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .center)
-            .offset(y: -100)
+            .offset(y: -30)
             
             // Strategy chart overlay
             if showStrategyChart {
@@ -296,55 +337,18 @@ struct TrainingModeView: View {
                 ZeroChipsOverlay(isPresented: $gameState.showZeroChipsOverlay)
             }
         }
-        .overlay {
-            // Background text - arched like a rainbow
-            GeometryReader { geo in
-                ZStack {
-                    // "Luna Lux Casino" - top arc
-                    createArchedText(
-                        text: "Luna Lux Casino",
-                        fontSize: 36,
-                        width: geo.size.width * 0.8,
-                        height: 80,
-                        centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 125
-                    )
-                    
-                    // "Blackjack pays 3 to 2" - middle arc
-                    createArchedText(
-                        text: "Blackjack pays 3 to 2",
-                        fontSize: 24,
-                        width: geo.size.width * 0.7,
-                        height: 60,
-                        centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 95
-                    )
-                    
-                    // "Dealer must hit on soft 17" - bottom arc
-                    createArchedText(
-                        text: "Dealer must hit on soft 17",
-                        fontSize: 20,
-                        width: geo.size.width * 0.6,
-                        height: 50,
-                        centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 65
-                    )
-                }
-                .allowsHitTesting(false)
-            }
-            .zIndex(-1)
-        }
         .frame(maxWidth: 1000) // Limit width on larger screens
         .frame(maxWidth: .infinity) // Center the content
     }
     
     private func dealerValueLabel() -> String {
-        if gameState.dealerHand.count < 2 {
+        if gameState.visuallyRevealedDealerHand.count < 1 {
             return "?"
         } else if gameState.isPlayerTurn {
-            return gameEngine.getHandValueText([gameState.dealerHand[1]])
+            // During player turn, only show the second dealer card (index 1 in dealt cards, but index 0 in visually revealed)
+            return gameEngine.getHandValueText([gameState.visuallyRevealedDealerHand[0]])
         } else {
-            return gameEngine.getHandValueText(gameState.dealerHand)
+            return gameEngine.getHandValueText(gameState.visuallyRevealedDealerHand)
         }
     }
     
@@ -362,10 +366,19 @@ struct TrainingModeView: View {
                 let archHeight = height * 0.3 // How much the middle is raised
                 let y = centerY - archHeight * sin(progress * .pi) // Creates a smooth arch
                 
-                Text(String(chars[i]))
-                    .font(.system(size: fontSize, weight: .bold))
-                    .foregroundColor(.white.opacity(0.15))
-                    .position(x: x, y: y)
+                ZStack {
+                    // Golden border layer (larger, underneath)
+                    Text(String(chars[i]))
+                        .font(.system(size: fontSize + 4, weight: .bold))
+                        .foregroundColor(.yellow.opacity(0.15))
+                        .position(x: x, y: y)
+                    
+                    // White text layer (smaller, on top)
+                    Text(String(chars[i]))
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .position(x: x, y: y)
+                }
             }
         }
     }
