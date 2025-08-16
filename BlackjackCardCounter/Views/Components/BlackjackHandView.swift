@@ -129,52 +129,99 @@ struct SplitHandsView: View {
     }
 }
 
-// MARK: - Flip Card View
+// MARK: - Flip Card View (natural flip: back 0→180, face -180→0; no lingering rotation at rest)
 struct FlipCardView: View {
     let card: Card
     let isFlipped: Bool
     var width: CGFloat = 60
     var glowWidth: CGFloat = 70
     @AppStorage("cardUnderglow") private var cardUnderglow: Bool = true
+
+    // Flip control
+    private let flipDuration: Double = 0.26
+    @State private var isAnimatingFlip: Bool = false
+    @State private var rotation: Double = 0          // 0 → 180 during flip
+    @State private var showingFace: Bool = false     // which side is shown at rest (no rotation)
     
     var body: some View {
         ZStack {
-            // Only show underglow when card is flipped (face-up)
-            if cardUnderglow && isFlipped && glowColor != .clear {
+            // Only show underglow when card is face-up
+            if cardUnderglow && showingFace && glowColor != .clear {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(glowColor)
                     .frame(width: glowWidth, height: 98)
                     .blur(radius: 12)
                     .opacity(0.7)
             }
-            
-            ZStack {
-                // Card face (shown when flipped)
-                Image(cardImageName)
-                    .resizable()
-                    .aspectRatio(0.7, contentMode: .fit)
-                    .frame(width: width, height: 90)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .opacity(isFlipped ? 1.0 : 0.0)
-                
-                // Deck cover (shown when not flipped)
-                Image("DeckCover")
-                    .resizable()
-                    .aspectRatio(0.7, contentMode: .fit)
-                    .frame(width: width, height: 90)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .opacity(isFlipped ? 0.0 : 1.0)
+
+            Group {
+                if isAnimatingFlip {
+                    // During flip: two layers with opposing rotations for a natural hinge
+                    ZStack {
+                        // FACE (becomes visible after 90°, ends at 0°)
+                        Image(cardImageName)
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: width, height: 90)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .opacity(rotation >= 90 ? 1 : 0)
+                            .rotation3DEffect(
+                                .degrees(rotation - 180),
+                                axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                            )
+
+                        // BACK (starts at 0°, disappears after 90°)
+                        Image("DeckCover")
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: width, height: 90)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .opacity(rotation >= 90 ? 0 : 1)
+                            .rotation3DEffect(
+                                .degrees(rotation),
+                                axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                            )
+                    }
+                } else {
+                    // At rest: render a single side without any rotation
+                    if showingFace {
+                        Image(cardImageName)
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: width, height: 90)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image("DeckCover")
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: width, height: 90)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
             }
-            .rotation3DEffect(
-                .degrees(isFlipped ? 180 : 0),
-                axis: (x: 0, y: 1, z: 0)
-            )
-            .animation(.easeInOut(duration: 0.6), value: isFlipped)
+            .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
         }
-        .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
+        .onAppear {
+            showingFace = isFlipped
+            rotation = 0
+        }
+        .onChange(of: isFlipped) { newValue in
+            guard showingFace != newValue else { return }
+            // Run a consistent flip: BACK 0→180, FACE -180→0
+            isAnimatingFlip = true
+            rotation = 0
+            withAnimation(.easeInOut(duration: flipDuration)) {
+                rotation = 180
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + flipDuration) {
+                showingFace = newValue
+                isAnimatingFlip = false
+                rotation = 0 // normalize at rest
+            }
+        }
     }
     
-    // Calculate the card image name based on flip state
+    // Calculate the card image name based on card value (uses your spelled-out assets)
     private var cardImageName: String {
         let rankString: String
         switch card.rank {
@@ -196,7 +243,7 @@ struct FlipCardView: View {
         return "\(rankString)Of\(suitString)"
     }
     
-    var glowColor: Color {
+    private var glowColor: Color {
         switch card.rank {
         case .ten, .jack, .queen, .king, .ace:
             return Color.red
@@ -262,13 +309,13 @@ struct CardView: View {
         .offset(y: appeared ? 0 : -250)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.4), value: appeared)
-        .onAppear { 
+        .onAppear {
             appeared = true
             print("🃏 Loading card image: \(card.imageName) for \(card.rank.rawValue) of \(card.suit.rawValue)")
         }
     }
     
-    var glowColor: Color {
+    private var glowColor: Color {
         switch card.rank {
         case .ten, .jack, .queen, .king, .ace:
             return Color.red
@@ -278,4 +325,5 @@ struct CardView: View {
             return Color.clear
         }
     }
-} 
+}
+

@@ -1,6 +1,5 @@
 import SwiftUI
-//test can you see this 
-
+//test
 struct RegularModeView: View {
     let map: Map
 
@@ -11,20 +10,24 @@ struct RegularModeView: View {
 
     // Regular mode specific state
     @State private var discardPile: [Card] = []
-    @Namespace private var cardAnimation
+    @Namespace private var cardAnimation              // existing namespace (deck/discard)
+    @Namespace private var mgCards                   // matched geometry for card handoff
     @State private var showZeroChipsOverlay = false
 
     // Table geometry (single source of truth)
     @State private var tableSize: CGSize = .zero
 
+    // Cache exact end positions so static cards “lock” where overlays end
+    @State private var finalPlayerPositions: [UUID : CGPoint] = [:]
+    @State private var finalDealerPositions: [UUID : CGPoint] = [:]
+
     // Layout
     private let cardSize = CGSize(width: 60, height: 90)
-    private let cardSpacing: CGFloat = 68
-    // Separate Y offsets (dealer up 5, player down 10 relative to last)
-    private let dealerYOffset: CGFloat = -43   // moved up by 3 from -40
-    private let playerYOffset: CGFloat = -7    // moved down by 3 from -10
+    private let cardSpacing: CGFloat = 70
+    private let dealerYOffset: CGFloat = -43
+    private let playerYOffset: CGFloat = -7
 
-    // Animations (straight move + flip, no bounce)
+    // Animations (straight move + flip)
     private let travelAnim  = Animation.easeInOut(duration: 0.50)
     private let flipAnim    = Animation.easeInOut(duration: 0.26)
 
@@ -152,6 +155,7 @@ struct RegularModeView: View {
                             // Hidden placeholders (stable IDs)
                             HStack(spacing: 8) {
                                 ForEach(Array(gameState.dealtPlayerCards.enumerated()), id: \.element.id) { _, card in
+                                    // Invisible placeholders reserve space; no animations here
                                     CardView(card: card, width: cardSize.width, glowWidth: 0)
                                         .opacity(0.0)
                                         .transaction { $0.animation = nil }
@@ -200,21 +204,37 @@ struct RegularModeView: View {
                                 bettingManager: bettingManager,
                                 animationCallback: { card, index, completion in
                                     // index: 0=P1, 1=D1, 2=P2, 3=D2
+                                    if index == 0 {
+                                        // first card of a new initial deal — clear caches
+                                        finalPlayerPositions.removeAll()
+                                        finalDealerPositions.removeAll()
+                                    }
+
                                     let isPlayer = (index == 0 || index == 2)
-                                    let pairIndex = index % 2 // 0 or 1
-                                    // Reserved two-card layout centered
+
+                                    // Map to slots (no stacking):
+                                    // Player: indices 0,2 -> slots 0,1; Dealer: 1,3 -> slots 0,1
+                                    let slotIndex: Int = isPlayer
+                                        ? (index == 0 ? 0 : 1)
+                                        : (index == 1 ? 0 : 1)
+
                                     let midX = tableSize.width * 0.5
                                     let startX = midX - (cardSpacing / 2)
-                                    let x = startX + CGFloat(pairIndex) * cardSpacing
+                                    let x = startX + CGFloat(slotIndex) * cardSpacing
                                     let y = yForHand(isPlayer: isPlayer, size: tableSize)
                                     let destination = CGPoint(x: x, y: y)
+
+                                    // Cache destination for static lock
+                                    if isPlayer { finalPlayerPositions[card.id] = destination }
+                                    else { finalDealerPositions[card.id] = destination }
+
+                                    // Animate overlay to destination + optional flip
                                     animateDeal(card: card, to: destination, shouldFlip: (index != 1)) {
-                                        // Insert static & remove overlay in SAME no-animation transaction
-                                        var t = Transaction(); t.disablesAnimations = true
-                                        withTransaction(t) {
+                                        // Let matchedGeometryEffect bridge the handoff; then cleanup.
+                                        withAnimation(.easeInOut(duration: 0.001)) {
                                             completion()
-                                            // overlay is removed inside cleanup call below (same transaction)
                                         }
+                                        cleanupAnimatedCard(card.id)
                                     }
                                 }
                             )
@@ -233,11 +253,11 @@ struct RegularModeView: View {
                     }
                 }
 
-                // ---- Animated cards overlay (straight move + flip; no scale/bounce) ----
+                // ---- Animated cards overlay (straight move + flip) ----
                 ForEach(Array(gameState.animatingCards.keys), id: \.self) { cardId in
                     if let card = gameState.animatingCards[cardId] {
                         ZStack {
-                            // Face
+                            // Face (rotate on the opposite half so it rests at 0° when visible)
                             Image(card.imageName)
                                 .resizable()
                                 .aspectRatio(0.7, contentMode: .fit)
@@ -250,7 +270,7 @@ struct RegularModeView: View {
                                     axis: (x: 0, y: 1, z: 0), perspective: 0.6
                                 )
 
-                            // Back
+                            // Back (0° → 180°)
                             Image("DeckCover")
                                 .resizable()
                                 .aspectRatio(0.7, contentMode: .fit)
@@ -262,6 +282,7 @@ struct RegularModeView: View {
                                     axis: (x: 0, y: 1, z: 0), perspective: 0.6
                                 )
                         }
+                        .matchedGeometryEffect(id: card.id, in: mgCards) // bridge to static
                         .position(
                             x: gameState.animatingCardPositions[cardId]?.x ?? gameState.deckPosition.x,
                             y: gameState.animatingCardPositions[cardId]?.y ?? gameState.deckPosition.y
@@ -271,42 +292,46 @@ struct RegularModeView: View {
                     }
                 }
 
-                // ---- Static cards (exactly where animated cards end up) ----
+                // ---- Static cards (dynamically positioned to prevent overlap) ----
                 // Dealer
                 ForEach(Array(gameState.dealtDealerCards.enumerated()), id: \.element.id) { idx, card in
                     if !gameState.animatingCards.keys.contains(card.id) {
-                        let count = gameState.dealtDealerCards.count
-                        let x = xForStaticCard(idx: idx, count: count, size: tableSize)
-                        let y = yForHand(isPlayer: false, size: tableSize)
+                        let computedX = xForStaticCard(idx: idx, count: gameState.dealtDealerCards.count, size: tableSize)
+                        let computedY = yForHand(isPlayer: false, size: tableSize)
+                        let pos = finalDealerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)
 
                         FlipCardView(
                             card: card,
                             isFlipped: gameState.flippedDealerCards.contains(idx),
                             width: cardSize.width, glowWidth: 0
                         )
-                        .position(x: x, y: y)
+                        .matchedGeometryEffect(id: card.id, in: mgCards)
+                        .position(pos)
                         .opacity(1)
                         .allowsHitTesting(false)
                         .transition(.identity)
-                        .animation(nil, value: gameState.dealtDealerCards)
-                        .transaction { $0.animation = nil }
+                        .animation(.easeInOut(duration: 0.3), value: gameState.dealtDealerCards.count)
                     }
                 }
 
-                // Player
+                // Player (use FlipCardView; always face-up)
                 ForEach(Array(gameState.dealtPlayerCards.enumerated()), id: \.element.id) { idx, card in
                     if !gameState.animatingCards.keys.contains(card.id) {
-                        let count = gameState.dealtPlayerCards.count
-                        let x = xForStaticCard(idx: idx, count: count, size: tableSize)
-                        let y = yForHand(isPlayer: true, size: tableSize)
+                        let computedX = xForStaticCard(idx: idx, count: gameState.dealtPlayerCards.count, size: tableSize)
+                        let computedY = yForHand(isPlayer: true, size: tableSize)
+                        let pos = finalPlayerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)
 
-                        CardView(card: card, width: cardSize.width, glowWidth: 0)
-                            .position(x: x, y: y)
-                            .opacity(1)
-                            .allowsHitTesting(false)
-                            .transition(.identity)
-                            .animation(nil, value: gameState.dealtPlayerCards)
-                            .transaction { $0.animation = nil }
+                        FlipCardView(
+                            card: card,
+                            isFlipped: true,
+                            width: cardSize.width, glowWidth: 0
+                        )
+                        .matchedGeometryEffect(id: card.id, in: mgCards)
+                        .position(pos)
+                        .opacity(1)
+                        .allowsHitTesting(false)
+                        .transition(.identity)
+                        .animation(.easeInOut(duration: 0.3), value: gameState.dealtPlayerCards.count)
                     }
                 }
             }
@@ -316,7 +341,7 @@ struct RegularModeView: View {
 
                 // Prewarm images
                 _ = UIImage(named: "DeckCover")
-                ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) }
+                ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) } // optional prewarm
 
                 gameEngine.resetDeck(gameState: gameState)
 
@@ -329,12 +354,12 @@ struct RegularModeView: View {
                     let y = yForHand(isPlayer: isPlayerCard, size: tableSize)
                     let destination = CGPoint(x: x, y: y)
 
+                    // Update all card positions to make space for the new card
+                    recalculateAllCardPositions(isPlayerCard: isPlayerCard, newCount: currentCount + 1)
+
                     animateHitCard(card: card, to: destination) {
-                        var t = Transaction(); t.disablesAnimations = true
-                        withTransaction(t) {
-                            completion()
-                            // overlay cleanup inside same transaction happens in animateHitCard
-                        }
+                        withAnimation(.easeInOut(duration: 0.001)) { completion() }
+                        cleanupAnimatedCard(card.id)
                     }
                 }
             }
@@ -368,7 +393,6 @@ struct RegularModeView: View {
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
         let playerY: CGFloat = isIPad ? size.height * 0.50 : size.height * 0.55
         let dealerY: CGFloat = isIPad ? size.height * 0.36 : size.height * 0.38
-        // apply separate offsets
         return isPlayer ? (playerY + playerYOffset) : (dealerY + dealerYOffset)
     }
 
@@ -379,7 +403,7 @@ struct RegularModeView: View {
         return startX + CGFloat(index) * cardSpacing
     }
 
-    // Keep initial 2-card layout during the initial deal to avoid re-centering "jumps"
+    // Keep initial 2-card layout during initial deal to avoid re-centering jumps
     private func xForStaticCard(idx: Int, count: Int, size: CGSize) -> CGFloat {
         if gameState.isDealing && count <= 2 {
             let midX = size.width * 0.5
@@ -416,8 +440,24 @@ struct RegularModeView: View {
         }
     }
 
-    // MARK: - Animations (straight path + flip + hard lock in same transaction)
+    // MARK: - Position Management
+    private func recalculateAllCardPositions(isPlayerCard: Bool, newCount: Int) {
+        if isPlayerCard {
+            for (index, card) in gameState.dealtPlayerCards.enumerated() {
+                let x = xForCard(index: index, count: newCount, size: tableSize)
+                let y = yForHand(isPlayer: true, size: tableSize)
+                finalPlayerPositions[card.id] = CGPoint(x: x, y: y)
+            }
+        } else {
+            for (index, card) in gameState.dealtDealerCards.enumerated() {
+                let x = xForCard(index: index, count: newCount, size: tableSize)
+                let y = yForHand(isPlayer: false, size: tableSize)
+                finalDealerPositions[card.id] = CGPoint(x: x, y: y)
+            }
+        }
+    }
 
+    // MARK: - Animations
     private func animateDeal(card: Card, to destination: CGPoint, shouldFlip: Bool, completion: @escaping () -> Void) {
         let cardId = card.id
 
@@ -434,21 +474,12 @@ struct RegularModeView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + travelT) {
                 withAnimation(flipAnim) { gameState.cardFlipRotations[cardId] = 180 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
-                    // Insert static AND remove overlay in SAME disabled transaction
-                    var t = Transaction(); t.disablesAnimations = true
-                    withTransaction(t) {
-                        completion()
-                        cleanupAnimatedCard(cardId)
-                    }
+                    completion()
                 }
             }
         } else {
             DispatchQueue.main.asyncAfter(deadline: .now() + travelT) {
-                var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) {
-                    completion()
-                    cleanupAnimatedCard(cardId)
-                }
+                completion()
             }
         }
     }
@@ -468,11 +499,7 @@ struct RegularModeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + travelT) {
             withAnimation(flipAnim) { gameState.cardFlipRotations[cardId] = 180 }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
-                var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) {
-                    completion()
-                    cleanupAnimatedCard(cardId)
-                }
+                completion()
             }
         }
     }
