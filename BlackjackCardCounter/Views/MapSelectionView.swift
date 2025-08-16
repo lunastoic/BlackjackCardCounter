@@ -177,8 +177,26 @@ struct MapCard: View {
                 VStack(spacing: 10) {
                     Spacer()
 
-                    Button(action: {
+                    ZStack {
+                        // Debug overlay - invisible but ensures clickable area
+                        Rectangle()
+                            .fill(Color.red.opacity(0.0))
+                            .frame(width: 162, height: 162)
+                        
+                        Image(showUnlockIcon ? "unlock" : "Lock")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 162, height: 162)
+                            .opacity(isUnlocking ? 0 : 1)
+                            .scaleEffect(isUnlocking ? 2 : 1)
+                            .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                    }
+                    .frame(width: 162, height: 162)
+                    .background(Color.blue.opacity(0.0)) // Invisible debug indicator
+                    .contentShape(Rectangle()) // Ensure entire area is tappable
+                    .onTapGesture {
                         guard !isUnlocking else { return }
+                        guard !showUnlockIcon else { return }
                         guard xpManager.userLevel >= map.requiredLevel else { return }
 
                         // Show the "unlock" asset briefly, then reveal buttons
@@ -197,17 +215,7 @@ struct MapCard: View {
                                 }
                             }
                         }
-                    }) {
-                        Image(showUnlockIcon ? "unlock" : "Lock")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 162, height: 162)
-                            .opacity(isUnlocking ? 0 : 1)
-                            .scaleEffect(isUnlocking ? 2 : 1)
-                            .animation(.easeInOut(duration: 0.5), value: isUnlocking)
                     }
-                    .buttonStyle(LockButtonStyle())
-                    .disabled(isUnlocking || showUnlockIcon) // prevent double taps during the 0.8s window
                     .zIndex(1000)
 
                     Text(map.name)
@@ -779,6 +787,7 @@ struct MapCard: View {
         }
         .frame(width: 300, height: 480)
         .clipShape(RoundedRectangle(cornerRadius: 32))
+        .contentShape(Rectangle())
         .onTapGesture {
             if unlocked {
                 onTap()
@@ -930,6 +939,9 @@ struct LiquidGlassGameModeButton: View {
 struct LockButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .frame(width: 162, height: 162) // Explicit size matching the image
+            .background(Color.clear) // Clear background for full hit area
+            .contentShape(Rectangle()) // Ensure entire rectangular area is tappable
             .scaleEffect(configuration.isPressed ? 0.7 : 1.0)
             .brightness(configuration.isPressed ? -0.3 : 0)
             .saturation(configuration.isPressed ? 0.7 : 1.0)

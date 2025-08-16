@@ -84,7 +84,7 @@ struct GameModeButton: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(Color(hex: "0f3460"))
+                .fill(Color(hex: "4A4A4A"))
                 .shadow(radius: 5)
         )
     }
