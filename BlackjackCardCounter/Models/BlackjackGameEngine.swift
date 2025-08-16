@@ -394,7 +394,8 @@ class BlackjackGameEngine: ObservableObject {
         let chipsBefore = XPChipManager.shared.userChips
         
         // For wins, we need to add back the bet amount plus winnings since chips were already subtracted
-        let actualPayout = payout > 0 ? payout + gameState.playerBet : payout
+        // For losses, don't deduct again since chips were already taken when bet was placed
+        let actualPayout = payout > 0 ? payout + gameState.playerBet : 0
         XPChipManager.shared.updateChips(actualPayout)
         
         let chipsAfter = XPChipManager.shared.userChips

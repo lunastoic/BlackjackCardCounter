@@ -238,6 +238,7 @@ struct RegularModeView: View {
                                 .foregroundColor(.yellow)
                                 .multilineTextAlignment(.center)
                                 .padding(.bottom, 8)
+                                .offset(y: -5)
                         }
 
                         BlackjackBettingView(
