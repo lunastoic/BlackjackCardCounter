@@ -8,13 +8,15 @@ struct BlackjackActionButtons: View {
     let getPerfectStrategyAction: () -> String?
     
     var body: some View {
+        let _ = print("🃏 BlackjackActionButtons rendered: playerHand.count=\(gameState.playerHand.count), canSplit=\(gameState.canSplit)")
+        
         HStack(spacing: 18) {
             PremiumActionButton(
                 title: "Double Down",
                 systemImage: "arrow.up.right.square.fill",
                 color1: "ff8800",
                 color2: "ffb300",
-                isEnabled: gameState.canDoubleDown,
+                isEnabled: gameState.playerBet * 2 <= XPChipManager.shared.userChips,
                 action: { gameEngine.doubleDownAction(gameState: gameState) },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Double Down"
             )
@@ -42,8 +44,15 @@ struct BlackjackActionButtons: View {
                 systemImage: "square.split.2x1.fill",
                 color1: "2193b0",
                 color2: "6dd5ed",
-                isEnabled: gameState.canSplit,
-                action: { gameEngine.splitAction(gameState: gameState) },
+                isEnabled: {
+                    let canSplit = gameState.canSplit
+                    print("🃏 Split button check: canSplit=\(canSplit), playerHand=\(gameState.playerHand.map { "\($0.rank.rawValue)" })")
+                    return canSplit
+                }(),
+                action: { 
+                    print("🃏 Split button tapped! canSplit=\(gameState.canSplit)")
+                    gameEngine.splitAction(gameState: gameState) 
+                },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Split"
             )
         }

@@ -63,13 +63,13 @@ struct BlackjackBettingView: View {
                     Text("Win $\(gameState.lastPayout)")
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.yellow)
+                        .foregroundColor(Color(hex: "00FF41"))
                         .multilineTextAlignment(.center)
                 } else if gameState.lastPayout < 0 {
                     Text("Lose -$\(-gameState.lastPayout)")
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.yellow)
+                        .foregroundColor(Color(hex: "DC143C"))
                         .multilineTextAlignment(.center)
                 } else {
                     Text("Push")

@@ -162,10 +162,10 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     func doubleDownAction(gameState: BlackjackGameState) {
-        if gameState.isSplit { return }
-        
+        print("🎲 Double Down action called!")
         if gameState.deck.count > 0 && gameState.playerHand.count == 2 && 
            gameState.playerBet * 2 <= XPChipManager.shared.userChips {
+            print("🎲 Double Down conditions met - executing double down!")
             
             XPChipManager.shared.updateChips(-gameState.playerBet)
             gameState.playerBet *= 2
@@ -209,29 +209,55 @@ class BlackjackGameEngine: ObservableObject {
                     }
                 }
             }
+        } else {
+            print("🎲 Double Down failed - deck: \(gameState.deck.count), playerHand: \(gameState.playerHand.count), bet: \(gameState.playerBet), chips: \(XPChipManager.shared.userChips)")
         }
     }
     
     func splitAction(gameState: BlackjackGameState) {
-        guard gameState.canSplit else { return }
+        print("🃏 Split action called!")
+        guard gameState.playerHand.count == 2 && gameState.playerBet * 2 <= XPChipManager.shared.userChips else { 
+            print("🃏 Split failed - basic requirements not met")
+            return 
+        }
+        
+        guard gameState.canSplitCards(card1: gameState.playerHand[0], card2: gameState.playerHand[1]) else {
+            print("🃏 Split failed - cards cannot be split")
+            return
+        }
+        
+        print("🃏 Split executing!")
+        
+        // Take chips for the split bet
+        XPChipManager.shared.userChips -= gameState.playerBet
+        print("🃏 Split: Deducted \(gameState.playerBet) chips for split bet. Remaining: \(XPChipManager.shared.userChips)")
         
         gameState.isSplit = true
         gameState.splitHands = [[gameState.playerHand[0]], [gameState.playerHand[1]]]
         
+        // Deal new cards to each split hand
         if gameState.deck.count > 0 {
             let card1 = gameState.deck.removeFirst()
             gameState.splitHands[0].append(card1)
             gameState.runningCount += card1.countValue
+            
+            // Update visual arrays for Regular Mode
+            gameState.dealtPlayerCards.append(card1)
+            print("🃏 Split: Added card to hand 1: \(card1.rank.rawValue)")
         }
         
         if gameState.deck.count > 0 {
             let card2 = gameState.deck.removeFirst()
             gameState.splitHands[1].append(card2)
             gameState.runningCount += card2.countValue
+            
+            // Update visual arrays for Regular Mode  
+            gameState.dealtPlayerCards.append(card2)
+            print("🃏 Split: Added card to hand 2: \(card2.rank.rawValue)")
         }
         
         gameState.activeHandIndex = 0
-        gameState.playerBet *= 2
+        // Note: Don't double playerBet here since we already deducted chips above
     }
     
     func nextSplitHandOrDealer(gameState: BlackjackGameState) {
@@ -340,20 +366,20 @@ class BlackjackGameEngine: ObservableObject {
                  (gameState.playerHand[1].rank == .ace && gameState.playerHand[0].rank.value == 10))
             
             if playerBusted {
-                msg = "Bust! You lose."
+                msg = "" // No message for bust
                 payout = -gameState.playerBet // Lose: subtract bet
             } else if playerHasBlackjack {
                 let blackjackWinnings = Int(Double(gameState.playerBet) * 1.5)
-                msg = "Blackjack! $\(blackjackWinnings) won!"
+                msg = "Blackjack!"
                 payout = gameState.playerBet + blackjackWinnings // bet + 1.5x bet
             } else if dealerVal > 21 || playerVal > dealerVal {
-                msg = "You win!"
+                msg = "" // No message for regular win
                 payout = gameState.playerBet // Win: add bet
             } else if playerVal == dealerVal {
-                msg = "Push."
+                msg = "" // No message for push
                 payout = 0 // Push: no change
             } else {
-                msg = "You lose."
+                msg = "" // No message for regular loss
                 payout = -gameState.playerBet // Lose: subtract bet
             }
         }
