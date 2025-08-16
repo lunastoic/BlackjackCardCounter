@@ -88,7 +88,9 @@ class BlackjackGameState: ObservableObject {
     }
     
     var canDoubleDown: Bool {
-        return playerBet * 2 <= XPChipManager.shared.userChips
+        let result = playerHand.count == 2 && playerBet * 2 <= XPChipManager.shared.userChips
+        print("🎲 canDoubleDown: \(result) (cards: \(playerHand.count), enoughChips: \(playerBet * 2 <= XPChipManager.shared.userChips))")
+        return result
     }
     
     var activeHand: [Card] {

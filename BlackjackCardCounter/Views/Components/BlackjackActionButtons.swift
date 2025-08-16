@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Action Buttons
 struct BlackjackActionButtons: View {
-    let gameState: BlackjackGameState
+    @ObservedObject var gameState: BlackjackGameState
     let gameEngine: BlackjackGameEngine
     let showStrategyHints: Bool
     let getPerfectStrategyAction: () -> String?
@@ -16,8 +16,15 @@ struct BlackjackActionButtons: View {
                 systemImage: "arrow.up.right.square.fill",
                 color1: "ff8800",
                 color2: "ffb300",
-                isEnabled: gameState.playerBet * 2 <= XPChipManager.shared.userChips,
-                action: { gameEngine.doubleDownAction(gameState: gameState) },
+                isEnabled: {
+                    let canDoubleDown = gameState.canDoubleDown
+                    print("🎲 Double Down button check: canDoubleDown=\(canDoubleDown), playerHand.count=\(gameState.playerHand.count)")
+                    return canDoubleDown
+                }(),
+                action: {
+                    print("🎲 Double Down tapped. canDoubleDown=\(gameState.canDoubleDown)")
+                    gameEngine.doubleDownAction(gameState: gameState)
+                },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Double Down"
             )
             
@@ -46,12 +53,13 @@ struct BlackjackActionButtons: View {
                 color2: "6dd5ed",
                 isEnabled: {
                     let canSplit = gameState.canSplit
-                    print("🃏 Split button check: canSplit=\(canSplit), playerHand=\(gameState.playerHand.map { "\($0.rank.rawValue)" })")
+                    let handRanks = gameState.playerHand.map { $0.rank.rawValue }
+                    print("🃏 Split button check: canSplit=\(canSplit), playerHand=\(handRanks)")
                     return canSplit
                 }(),
-                action: { 
-                    print("🃏 Split button tapped! canSplit=\(gameState.canSplit)")
-                    gameEngine.splitAction(gameState: gameState) 
+                action: {
+                    print("🃏 Split tapped. canSplit=\(gameState.canSplit)")
+                    gameEngine.splitAction(gameState: gameState)
                 },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Split"
             )
@@ -89,12 +97,15 @@ struct PremiumActionButton: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .opacity(isEnabled ? 1.0 : 0.4)
             )
             .cornerRadius(14)
             .shadow(color: highlighted ? .yellow : .clear, radius: 16)
             .shadow(color: Color.black.opacity(0.18), radius: 5, x: 0, y: 2)
         }
-        .disabled(!isEnabled)
+        // Don’t use .disabled() (it auto-dims to ~50% and stacks with other opacities)
+        .allowsHitTesting(isEnabled)                 // blocks taps when “disabled”
+        .opacity(isEnabled ? 1.0 : 0.5)              // exactly 50% opacity when not enabled
+        .animation(.easeInOut(duration: 0.2), value: isEnabled)
     }
-} 
+}
+
