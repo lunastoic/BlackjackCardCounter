@@ -54,6 +54,35 @@ struct SettingsView: View {
                                 .foregroundColor(.gray)
                         }
                     }
+                    
+                    // Debug Section (Remove before launch)
+                    SettingsSection(title: "Debug") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Button(action: {
+                                // Reset maps to locked state (only first map unlocked)
+                                UserDefaults.standard.set("1", forKey: "unlockedMaps")
+                            }) {
+                                HStack {
+                                    Image(systemName: "lock.rotation")
+                                        .foregroundColor(.red)
+                                    Text("Reset Maps (Debug)")
+                                        .foregroundColor(.red)
+                                        .fontWeight(.medium)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.red, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Text("⚠️ This will lock all maps except the first one")
+                                .font(.caption)
+                                .foregroundColor(.red.opacity(0.8))
+                        }
+                    }
                 }
                 .padding()
             }

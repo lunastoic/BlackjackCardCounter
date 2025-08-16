@@ -73,7 +73,7 @@ struct GameModeButton: View {
                 
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.white)
             }
             
             Spacer()
