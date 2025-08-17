@@ -81,6 +81,28 @@ struct SettingsView: View {
                             Text("⚠️ This will lock all maps except the first one")
                                 .font(.caption)
                                 .foregroundColor(.red.opacity(0.8))
+                            
+                            Divider()
+                                .background(Color.white.opacity(0.3))
+                                .padding(.vertical, 5)
+                            
+                            // Force Pairs Toggle for Split Testing
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Force Pairs (Split Testing)")
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                    Text("Always deal pairs for testing split functionality")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                                Toggle("", isOn: .init(
+                                    get: { UserDefaults.standard.bool(forKey: "debugForcePairs") },
+                                    set: { UserDefaults.standard.set($0, forKey: "debugForcePairs") }
+                                ))
+                                .labelsHidden()
+                            }
                         }
                     }
                 }

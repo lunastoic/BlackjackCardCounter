@@ -277,10 +277,19 @@ struct TrainingModeView: View {
                             )
                         }
                     }
+                            }
+            .onAppear {
+                gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+            }
+            .onDisappear {
+                // Return any unplayed bets when leaving the view
+                if gameState.playerBet > 0 && !gameState.showNextHand && gameState.resultMessage == nil {
+                    print("🔄 Training Mode: Returning unplayed bet of $\(gameState.playerBet)")
+                    XPChipManager.shared.updateChips(gameState.playerBet)
+                    gameState.playerBet = 0
+                    gameState.betChips = []
                 }
-                .onAppear {
-                    gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
-                }
+            }
             }
             
             // Floating button to open strategy chart
