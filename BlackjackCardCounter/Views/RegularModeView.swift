@@ -172,7 +172,7 @@ struct RegularModeView: View {
                                         ForEach(gameState.splitHands.indices, id: \.self) { idx in
                                             VStack {
                                                 HStack {
-                                                    Text("Hand \(idx + 1)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
+                                                    Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
                                                         .font(.caption)
                                                         .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
                                                     Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
@@ -293,12 +293,18 @@ struct RegularModeView: View {
                         }
 
                         if gameState.isPlayerTurn && gameState.playerHand.count >= 2 {
-                            BlackjackActionButtons(
-                                gameState: gameState,
-                                gameEngine: gameEngine,
-                                showStrategyHints: false,
-                                getPerfectStrategyAction: { nil }
-                            )
+                            // Check if current active hand has blackjack (don't show buttons if so)
+                            let activeHasBlackjack = gameState.isSplit && 
+                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                            
+                            if !activeHasBlackjack {
+                                BlackjackActionButtons(
+                                    gameState: gameState,
+                                    gameEngine: gameEngine,
+                                    showStrategyHints: false,
+                                    getPerfectStrategyAction: { nil }
+                                )
+                            }
                         }
 
                         Spacer()

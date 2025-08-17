@@ -107,7 +107,7 @@ struct SplitHandsView: View {
             ForEach(gameState.splitHands.indices, id: \.self) { idx in
                 VStack {
                     HStack {
-                        Text("Hand \(idx + 1)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
+                                                    Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
                             .font(.caption)
                             .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
                         Text(gameEngine.getHandValueText(gameState.splitHands[idx]))

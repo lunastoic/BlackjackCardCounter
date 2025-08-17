@@ -39,6 +39,37 @@ class BlackjackGameEngine: ObservableObject {
     }
 
     func isBust(_ hand: [Card]) -> Bool { handValue(hand) > 21 }
+    
+    func isBlackjack(_ hand: [Card]) -> Bool {
+        return hand.count == 2 && handValue(hand) == 21
+    }
+    
+    // Check if current active split hand should auto-advance (21 or blackjack)
+    private func checkSplitHandAutoAdvance(gameState: BlackjackGameState) {
+        guard gameState.isSplit else { return }
+        
+        let activeHand = gameState.splitHands[gameState.activeHandIndex]
+        let activeValue = handValue(activeHand)
+        
+        // Auto-advance if active hand has 21 (blackjack or regular 21)
+        if activeValue == 21 {
+            let handNumber = gameState.activeHandIndex == 1 ? 1 : 2
+            print("🃏 Split hand \(handNumber) (index \(gameState.activeHandIndex)) has 21 - auto-advancing")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("🃏 Auto-advance executing for hand \(handNumber)")
+                if gameState.activeHandIndex == 0 {
+                    // Hand 2 (left, last hand) - go to dealer
+                    print("🃏 Last hand complete, starting dealer turn")
+                    self.dealerTurn(gameState: gameState)
+                } else {
+                    // Hand 1 (right) - go to Hand 2
+                    print("🃏 Moving from Hand 1 to Hand 2")
+                    gameState.activeHandIndex = 0
+                }
+            }
+        }
+    }
 
     func isSoftHand(_ hand: [Card]) -> Bool {
         var total = 0
@@ -83,8 +114,12 @@ class BlackjackGameEngine: ObservableObject {
             let newCard = gameState.deck.removeFirst()
             gameState.splitHands[gameState.activeHandIndex].append(newCard)
             gameState.runningCount += newCard.countValue
+            
             if isBust(gameState.splitHands[gameState.activeHandIndex]) {
                 nextSplitHandOrDealer(gameState: gameState)
+            } else {
+                // Check if hand has 21 and should auto-advance
+                checkSplitHandAutoAdvance(gameState: gameState)
             }
         } else {
             let newCard = gameState.deck.removeFirst()
@@ -166,7 +201,7 @@ class BlackjackGameEngine: ObservableObject {
 
         gameState.isSplit = true
         gameState.splitHands = [[gameState.playerHand[0]], [gameState.playerHand[1]]]
-        gameState.activeHandIndex = 0
+        gameState.activeHandIndex = 1  // Start with right hand (matches dealing order)
 
         // Deal follow-up cards to RIGHT hand first, then LEFT using the same animation profile
         dealSplitCardsSequentially(gameState: gameState)
@@ -182,12 +217,38 @@ class BlackjackGameEngine: ObservableObject {
             let handIndex = order[step]
             guard handIndex < gameState.splitHands.count, !gameState.deck.isEmpty else { return }
 
-            let card = gameState.deck.removeFirst()
+            // Debug: Force specific cards for split hands when debugForcePairs is enabled
+            let forcePairs = UserDefaults.standard.bool(forKey: "debugForcePairs")
+            var card: Card
+            
+            if forcePairs && handIndex == 0 {
+                // Hand 2 (left hand, index 0) - force an Ace for easy 21 testing
+                if let aceIndex = gameState.deck.firstIndex(where: { $0.rank == .ace }) {
+                    card = gameState.deck.remove(at: aceIndex)
+                    print("🎲 Debug: Forced Ace for Hand 2 (left)")
+                } else {
+                    card = gameState.deck.removeFirst()
+                    print("🎲 Debug: No Ace available, using: \(card.rank.rawValue)")
+                }
+            } else {
+                // Normal card dealing or Hand 1
+                card = gameState.deck.removeFirst()
+                if forcePairs {
+                    print("🎲 Debug: Normal card for Hand 1 (right): \(card.rank.rawValue)")
+                }
+            }
+            
             gameState.runningCount += card.countValue
 
             if let splitCB = splitAnimationCallback {
                 splitCB(card, handIndex) {
                     gameState.splitHands[handIndex].append(card)  // add only after anim completes
+                    
+                    // Check if the hand that just received a card should auto-advance
+                    if gameState.activeHandIndex == handIndex {
+                        self.checkSplitHandAutoAdvance(gameState: gameState)
+                    }
+                    
                     step += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { dealNext() }
                 }
@@ -195,6 +256,12 @@ class BlackjackGameEngine: ObservableObject {
                 // Fallback if no UI callback
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     gameState.splitHands[handIndex].append(card)
+                    
+                    // Check if the hand that just received a card should auto-advance
+                    if gameState.activeHandIndex == handIndex {
+                        self.checkSplitHandAutoAdvance(gameState: gameState)
+                    }
+                    
                     step += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { dealNext() }
                 }
@@ -205,8 +272,13 @@ class BlackjackGameEngine: ObservableObject {
     }
 
     func nextSplitHandOrDealer(gameState: BlackjackGameState) {
-        if gameState.activeHandIndex == 0 { gameState.activeHandIndex = 1 }
-        else { dealerTurn(gameState: gameState) }
+        if gameState.activeHandIndex == 1 { 
+            gameState.activeHandIndex = 0  // Right → Left (Hand 2)
+            // Check if Hand 2 already has blackjack/21 and should auto-advance to dealer
+            checkSplitHandAutoAdvance(gameState: gameState)
+        } else { 
+            dealerTurn(gameState: gameState)  // Left → Dealer
+        }
     }
 
     func dealerTurn(gameState: BlackjackGameState) {
@@ -267,10 +339,11 @@ class BlackjackGameEngine: ObservableObject {
             let dealerVal = self.handValue(gameState.dealerHand)
 
             for (i, val) in playerVals.enumerated() {
-                if val > 21 { msg += "Hand \(i+1): Bust!\n"; payout -= handBet }
-                else if dealerVal > 21 || val > dealerVal { msg += "Hand \(i+1): Win!\n"; payout += handBet }
-                else if val == dealerVal { msg += "Hand \(i+1): Push.\n" }
-                else { msg += "Hand \(i+1): Lose.\n"; payout -= handBet }
+                let handNumber = i == 1 ? 1 : 2  // Match display logic: index 1 = Hand 1, index 0 = Hand 2
+                if val > 21 { msg += "Hand \(handNumber): Bust!\n"; payout -= handBet }
+                else if dealerVal > 21 || val > dealerVal { msg += "Hand \(handNumber): Win!\n"; payout += handBet }
+                else if val == dealerVal { msg += "Hand \(handNumber): Push.\n" }
+                else { msg += "Hand \(handNumber): Lose.\n"; payout -= handBet }
             }
         } else {
             let playerVal = handValue(gameState.playerHand)

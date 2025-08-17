@@ -197,7 +197,7 @@ struct TrainingModeView: View {
                                     ForEach(gameState.splitHands.indices, id: \.self) { idx in
                                         VStack {
                                             HStack {
-                                                Text("Hand \(idx + 1)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
+                                                Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
                                                     .font(.caption)
                                                     .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
                                                 Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
@@ -236,17 +236,23 @@ struct TrainingModeView: View {
                         
                         // Show result message after round
                         if gameState.showNextHand && gameState.isPlayerTurn {
-                            BlackjackActionButtons(
-                                gameState: gameState,
-                                gameEngine: gameEngine,
-                                showStrategyHints: showStrategyHints,
-                                getPerfectStrategyAction: {
-                                    strategyHelper.getPerfectStrategyAction(
-                                        playerHand: gameState.playerHand,
-                                        dealerHand: gameState.dealerHand
-                                    )
-                                }
-                            )
+                            // Check if current active hand has blackjack (don't show buttons if so)
+                            let activeHasBlackjack = gameState.isSplit && 
+                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                            
+                            if !activeHasBlackjack {
+                                BlackjackActionButtons(
+                                    gameState: gameState,
+                                    gameEngine: gameEngine,
+                                    showStrategyHints: showStrategyHints,
+                                    getPerfectStrategyAction: {
+                                        strategyHelper.getPerfectStrategyAction(
+                                            playerHand: gameState.playerHand,
+                                            dealerHand: gameState.dealerHand
+                                        )
+                                    }
+                                )
+                            }
                         }
                         
                         Spacer().frame(height: 24)
