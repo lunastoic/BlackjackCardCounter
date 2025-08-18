@@ -58,8 +58,8 @@ class BlackjackGameState: ObservableObject {
     var canSplit: Bool {
         print("🃏 canSplit called: isSplit=\(isSplit), handCount=\(playerHand.count), bet=\(playerBet), chips=\(XPChipManager.shared.userChips)")
         
-        guard !isSplit && playerHand.count == 2 && playerBet * 2 <= XPChipManager.shared.userChips else {
-            print("🃏 canSplit guard failed: !isSplit=\(!isSplit), handCount==2=\(playerHand.count == 2), bet*2<=chips=\(playerBet * 2 <= XPChipManager.shared.userChips)")
+        guard !isSplit && playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips else {
+            print("🃏 canSplit guard failed: !isSplit=\(!isSplit), handCount==2=\(playerHand.count == 2), bet<=chips=\(playerBet <= XPChipManager.shared.userChips)")
             return false
         }
         
@@ -88,8 +88,9 @@ class BlackjackGameState: ObservableObject {
     }
     
     var canDoubleDown: Bool {
-        let result = playerHand.count == 2 && playerBet * 2 <= XPChipManager.shared.userChips
-        print("🎲 canDoubleDown: \(result) (cards: \(playerHand.count), enoughChips: \(playerBet * 2 <= XPChipManager.shared.userChips))")
+        // Check if we have enough chips for double down (need playerBet amount more)
+        let result = playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips
+        print("🎲 canDoubleDown: \(result) (cards: \(playerHand.count), bet: \(playerBet), availableChips: \(XPChipManager.shared.userChips))")
         return result
     }
     

@@ -153,23 +153,23 @@ struct FlipCardView: View {
                     .blur(radius: 12)
                     .opacity(0.7)
             }
-
+            
             Group {
                 if isAnimatingFlip {
                     // During flip: two layers with opposing rotations for a natural hinge
-                    ZStack {
+            ZStack {
                         // FACE (becomes visible after 90°, ends at 0°)
-                        Image(cardImageName)
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                            .frame(width: width, height: 90)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                Image(cardImageName)
+                    .resizable()
+                    .aspectRatio(0.7, contentMode: .fit)
+                    .frame(width: width, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                             .opacity(rotation >= 90 ? 1 : 0)
                             .rotation3DEffect(
                                 .degrees(rotation - 180),
                                 axis: (x: 0, y: 1, z: 0), perspective: 0.6
                             )
-
+                
                         // BACK (starts at 0°, disappears after 90°)
                         Image("DeckCover")
                             .resizable()
@@ -191,16 +191,16 @@ struct FlipCardView: View {
                             .frame(width: width, height: 90)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
-                        Image("DeckCover")
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                            .frame(width: width, height: 90)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                Image("DeckCover")
+                    .resizable()
+                    .aspectRatio(0.7, contentMode: .fit)
+                    .frame(width: width, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }
             .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
-        }
+            }
         .onAppear {
             showingFace = isFlipped
             rotation = 0
@@ -309,7 +309,7 @@ struct CardView: View {
         .offset(y: appeared ? 0 : -250)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.4), value: appeared)
-        .onAppear {
+        .onAppear { 
             appeared = true
             print("🃏 Loading card image: \(card.imageName) for \(card.rank.rawValue) of \(card.suit.rawValue)")
         }
@@ -325,5 +325,5 @@ struct CardView: View {
             return Color.clear
         }
     }
-}
+} 
 

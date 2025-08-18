@@ -13,7 +13,7 @@ class BlackjackBettingManager: ObservableObject {
         print("🔵 Current betChips: \(gameState.betChips)")
         print("🔵 Available chips: \(XPChipManager.shared.userChips)")
         
-        if gameState.playerBet + chipValue <= XPChipManager.shared.userChips {
+        if chipValue <= XPChipManager.shared.userChips {
             gameState.playerBet += chipValue
             gameState.betChips.append(chipValue)
             // Decrease user's chip count when placing a bet
@@ -71,7 +71,8 @@ class BlackjackBettingManager: ObservableObject {
     }
     
     func canPlaceBet(gameState: BlackjackGameState, chipValue: Int) -> Bool {
-        return gameState.playerBet + chipValue <= XPChipManager.shared.userChips
+        // Check if we have enough remaining chips to place this additional bet
+        return chipValue <= XPChipManager.shared.userChips
     }
     
     func canRedoBet(gameState: BlackjackGameState) -> Bool {

@@ -5,7 +5,7 @@ struct MapSelectionView: View {
     @GestureState private var dragOffset: CGFloat = 0
     @ObservedObject private var xpManager = XPChipManager.shared
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // 1 is always unlocked
-
+    
     let maps: [Map] = [
         Map(id: 1, name: "Luna Luxe Casino",       imageName: "RealLunaLuxe",  isLocked: false, requiredLevel: 1),
         Map(id: 2, name: "Io Inferno Lounge",       imageName: "RealLounge",    isLocked: false, requiredLevel: 5),
@@ -14,7 +14,7 @@ struct MapSelectionView: View {
         Map(id: 5, name: "Titan Methane Mirage",    imageName: "TitanMethane",  isLocked: false, requiredLevel: 20),
         Map(id: 6, name: "Kepler Fortune",          imageName: "Kepler", isLocked: false, requiredLevel: 25)
     ]
-
+    
     private func isUnlocked(_ map: Map) -> Bool {
         unlockedMaps.split(separator: ",").compactMap { Int($0) }.contains(map.id)
     }
@@ -24,19 +24,19 @@ struct MapSelectionView: View {
         ids.insert(map.id)
         unlockedMaps = ids.sorted().map(String.init).joined(separator: ",")
     }
-
+    
     var body: some View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
                 startPoint: .top, endPoint: .bottom
             )
-            .ignoresSafeArea()
+                .ignoresSafeArea()
 
             VStack(spacing: 24) {
                 // Header
                 GameHeaderView()
-
+                
                 Text("Select Map")
                     .font(.largeTitle)
                     .fontWeight(.bold)
@@ -68,9 +68,9 @@ struct MapSelectionView: View {
                                 onTap: { selectedIndex = i },
                                 unlockAction: {
                                     if xpManager.userLevel >= map.requiredLevel {
-                                        unlockMap(map)
-                                    }
+                                    unlockMap(map)
                                 }
+                            }
                             )
                             .frame(width: cardWidth, height: cardHeight)
                             .opacity(isSelected ? 1.0 : 0.6)
@@ -187,9 +187,9 @@ struct MapCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 162, height: 162)
-                            .opacity(isUnlocking ? 0 : 1)
-                            .scaleEffect(isUnlocking ? 2 : 1)
-                            .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                        .opacity(isUnlocking ? 0 : 1)
+                        .scaleEffect(isUnlocking ? 2 : 1)
+                        .animation(.easeInOut(duration: 0.5), value: isUnlocking)
                     }
                     .frame(width: 162, height: 162)
                     .background(Color.blue.opacity(0.0)) // Invisible debug indicator
@@ -274,26 +274,26 @@ struct MapCard: View {
                     Spacer(minLength: 40)
 
                     // Per-map themed buttons (same format you sent)
-                    if map.name == "Luna Luxe Casino" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
-                                GameModeButton(title: "Training Mode", description: "Learn with visuals and tutorials", systemImage: "book.fill")
+                        if map.name == "Luna Luxe Casino" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
+                                    GameModeButton(title: "Training Mode", description: "Learn with visuals and tutorials", systemImage: "book.fill")
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    GameModeButton(title: "Regular Mode", description: "Classic casino experience", systemImage: "play.fill")
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    GameModeButton(title: "Quiz Mode", description: "Test your knowledge", systemImage: "questionmark.circle.fill")
+                                }
                             }
-                            NavigationLink(destination: RegularModeView(map: map)) {
-                                GameModeButton(title: "Regular Mode", description: "Classic casino experience", systemImage: "play.fill")
-                            }
-                            NavigationLink(destination: QuizModeView(map: map)) {
-                                GameModeButton(title: "Quiz Mode", description: "Test your knowledge", systemImage: "questionmark.circle.fill")
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                    } else if map.name == "Io Inferno Lounge" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
+                        } else if map.name == "Io Inferno Lounge" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
                                         .font(.title)
@@ -322,8 +322,8 @@ struct MapCard: View {
                                         .fill(Color.orange.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: RegularModeView(map: map)) {
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
                                         .font(.title)
@@ -352,8 +352,8 @@ struct MapCard: View {
                                         .fill(Color.orange.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: QuizModeView(map: map)) {
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
                                         .font(.title)
@@ -382,16 +382,16 @@ struct MapCard: View {
                                         .fill(Color.orange.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
+                                }
                             }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                    } else if map.name == "Europa Ice Palace" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
+                        } else if map.name == "Europa Ice Palace" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
                                         .font(.title)
@@ -420,8 +420,8 @@ struct MapCard: View {
                                         .fill(Color(hex: "00eaff").opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: RegularModeView(map: map)) {
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
                                         .font(.title)
@@ -450,8 +450,8 @@ struct MapCard: View {
                                         .fill(Color(hex: "00eaff").opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: QuizModeView(map: map)) {
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
                                         .font(.title)
@@ -480,16 +480,16 @@ struct MapCard: View {
                                         .fill(Color(hex: "00eaff").opacity(0.8))
                                         .shadow(radius: 5)
                                 )
+                                }
                             }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
                     } else if map.name == "Ganymede Grand" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
                                         .font(.title)
@@ -518,8 +518,8 @@ struct MapCard: View {
                                         .fill(Color.purple.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: RegularModeView(map: map)) {
+                                }
+                                NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
                                         .font(.title)
@@ -548,8 +548,8 @@ struct MapCard: View {
                                         .fill(Color.purple.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                            NavigationLink(destination: QuizModeView(map: map)) {
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
                                         .font(.title)
@@ -578,10 +578,10 @@ struct MapCard: View {
                                         .fill(Color.purple.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
+                                }
                             }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
@@ -733,7 +733,7 @@ struct MapCard: View {
                                             .foregroundColor(.white)
                                     }
                                     
-                                    Spacer()
+                        Spacer()
                                     
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(.gray)
@@ -763,7 +763,7 @@ struct MapCard: View {
                                             .foregroundColor(.white)
                                     }
                                     
-                                    Spacer()
+                        Spacer()
                                     
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(.gray)
@@ -774,8 +774,8 @@ struct MapCard: View {
                                         .fill(Color(hex: "D4AF37").opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
-                        }
+            }
+        }
                         .padding(.horizontal, 12)
                         .padding(.bottom, 18)
                         .opacity(1.0)
@@ -963,5 +963,5 @@ struct LockButtonStyle: ButtonStyle {
     NavigationView {
         MapSelectionView()
     }
-}
+} 
 

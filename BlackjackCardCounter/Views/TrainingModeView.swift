@@ -241,17 +241,17 @@ struct TrainingModeView: View {
                                 gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
                             
                             if !activeHasBlackjack {
-                                BlackjackActionButtons(
-                                    gameState: gameState,
-                                    gameEngine: gameEngine,
-                                    showStrategyHints: showStrategyHints,
-                                    getPerfectStrategyAction: {
-                                        strategyHelper.getPerfectStrategyAction(
-                                            playerHand: gameState.playerHand,
-                                            dealerHand: gameState.dealerHand
-                                        )
-                                    }
-                                )
+                            BlackjackActionButtons(
+                                gameState: gameState,
+                                gameEngine: gameEngine,
+                                showStrategyHints: showStrategyHints,
+                                getPerfectStrategyAction: {
+                                    strategyHelper.getPerfectStrategyAction(
+                                        playerHand: gameState.playerHand,
+                                        dealerHand: gameState.dealerHand
+                                    )
+                                }
+                            )
                             }
                         }
                         
@@ -283,10 +283,10 @@ struct TrainingModeView: View {
                             )
                         }
                     }
-                            }
-            .onAppear {
-                gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
-            }
+                }
+                .onAppear {
+                    gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                }
             .onDisappear {
                 // Return any unplayed bets when leaving the view
                 if gameState.playerBet > 0 && !gameState.showNextHand && gameState.resultMessage == nil {

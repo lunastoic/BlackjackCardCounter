@@ -103,6 +103,34 @@ struct SettingsView: View {
                                 ))
                                 .labelsHidden()
                             }
+                            
+                            Divider()
+                                .background(Color.white.opacity(0.3))
+                                .padding(.vertical, 5)
+                            
+                            // Add 3000 Chips Button for Testing
+                            Button(action: {
+                                XPChipManager.shared.updateChips(3000)
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Add 3000 Chips (Testing)")
+                                        .foregroundColor(.green)
+                                        .fontWeight(.medium)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.green, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Text("💰 Adds 3000 chips to your current balance for testing")
+                                .font(.caption)
+                                .foregroundColor(.green.opacity(0.8))
                         }
                     }
                 }
