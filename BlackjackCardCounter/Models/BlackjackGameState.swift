@@ -56,10 +56,18 @@ class BlackjackGameState: ObservableObject {
     var cardsRemaining: Int { deck.count }
     
     var canSplit: Bool {
-        print("🃏 canSplit called: isSplit=\(isSplit), handCount=\(playerHand.count), bet=\(playerBet), chips=\(XPChipManager.shared.userChips)")
+        print("🃏 🔴 canSplit called: isSplit=\(isSplit), handCount=\(playerHand.count), bet=\(playerBet), chips=\(XPChipManager.shared.userChips)")
         
-        guard !isSplit && playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips else {
-            print("🃏 canSplit guard failed: !isSplit=\(!isSplit), handCount==2=\(playerHand.count == 2), bet<=chips=\(playerBet <= XPChipManager.shared.userChips)")
+        let hasEnoughChips = playerBet <= XPChipManager.shared.userChips
+        print("🃏 🔴 CHIP VALIDATION: need \(playerBet), have \(XPChipManager.shared.userChips), RESULT: \(hasEnoughChips ? "PASS" : "FAIL")")
+        
+        let notSplit = !isSplit
+        let correctHandCount = playerHand.count == 2
+        
+        print("🃏 🔴 ALL VALIDATIONS: notSplit=\(notSplit), correctHandCount=\(correctHandCount), hasEnoughChips=\(hasEnoughChips)")
+        
+        guard notSplit && correctHandCount && hasEnoughChips else {
+            print("🃏 🔴 canSplit FAILED - returning false")
             return false
         }
         
@@ -69,7 +77,8 @@ class BlackjackGameState: ObservableObject {
         // Check if both cards have the same splitting value
         let canSplitCards = canSplitCards(card1: card1, card2: card2)
         
-        print("🃏 Split check: cards=\(card1.rank.rawValue)-\(card2.rank.rawValue), values=\(card1.rank.value)-\(card2.rank.value), canSplit=\(canSplitCards)")
+        print("🃏 🔴 CARD CHECK: \(card1.rank.rawValue)(\(card1.rank.value)) vs \(card2.rank.rawValue)(\(card2.rank.value)), canSplitCards=\(canSplitCards)")
+        print("🃏 🔴 FINAL RESULT: canSplit=\(canSplitCards)")
         
         return canSplitCards
     }

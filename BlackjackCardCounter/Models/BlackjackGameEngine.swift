@@ -191,15 +191,31 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     func splitAction(gameState: BlackjackGameState) {
+        print("🃏 🟡 splitAction called: playerBet=\(gameState.playerBet), userChips=\(XPChipManager.shared.userChips)")
+        
+        let hasEnoughChips = gameState.playerBet <= XPChipManager.shared.userChips
+        let hasValidCards = gameState.canSplitCards(card1: gameState.playerHand[0], card2: gameState.playerHand[1])
+        
+        print("🃏 🟡 splitAction CHIP CHECK: need \(gameState.playerBet), have \(XPChipManager.shared.userChips), RESULT: \(hasEnoughChips ? "PASS" : "FAIL")")
+        print("🃏 🟡 splitAction validation: handCount=\(gameState.playerHand.count), hasEnough=\(hasEnoughChips), validCards=\(hasValidCards)")
+        
         guard gameState.playerHand.count == 2,
-              gameState.playerBet <= XPChipManager.shared.userChips,
-              gameState.canSplitCards(card1: gameState.playerHand[0], card2: gameState.playerHand[1])
-        else { return }
+              hasEnoughChips,
+              hasValidCards
+        else { 
+            print("🃏 🟡 splitAction BLOCKED - guard failed")
+            return 
+        }
 
+        print("🃏 splitAction proceeding - deducting \(gameState.playerBet) chips")
         // Take the second bet
-        XPChipManager.shared.userChips -= gameState.playerBet
+        XPChipManager.shared.updateChips(-gameState.playerBet)
         
         gameState.isSplit = true
+        // Double the total bet amount since we now have two hands with equal bets
+        gameState.playerBet *= 2
+        print("🃏 Split complete - total bet now: \(gameState.playerBet) (\(gameState.playerBet/2) per hand)")
+        
         gameState.splitHands = [[gameState.playerHand[0]], [gameState.playerHand[1]]]
         gameState.activeHandIndex = 1  // Start with right hand (matches dealing order)
 
@@ -405,10 +421,10 @@ class BlackjackGameEngine: ObservableObject {
         useRegularModeAnimation: Bool = false,
         animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
     ) {
-        guard gameState.deck.count >= 4 else { resetDeck(gameState: gameState); return }
+                guard gameState.deck.count >= 4 else { resetDeck(gameState: gameState); return }
         gameState.isDealing = true
-        
-        if gameState.playerBet > XPChipManager.shared.userChips { gameState.playerBet = XPChipManager.shared.userChips }
+
+        // Save the bet for redo functionality (never modify the actual bet)
         if gameState.playerBet > 0 { gameState.lastBet = gameState.playerBet }
         
         gameState.resultMessage = nil
