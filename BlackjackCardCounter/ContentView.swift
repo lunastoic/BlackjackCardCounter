@@ -148,8 +148,23 @@ struct RewardsButton: View {
             .cornerRadius(18)
             .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12, x: 0, y: 4)
             .scaleEffect(animate && rewardAvailable ? 1.08 : 1.0)
-            .animation(rewardAvailable ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true) : .default, value: animate)
-            .onAppear { animate = true }
+            .onAppear {
+                guard rewardAvailable else { return }
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    animate = true
+                }
+            }
+            .onChange(of: rewardAvailable) { isAvailable in
+                if isAvailable {
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        animate = true
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animate = false
+                    }
+                }
+            }
     }
 }
 

@@ -378,7 +378,14 @@ class BlackjackGameEngine: ObservableObject {
         gameState.showDebugPayout = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { gameState.showDebugPayout = false }
 
-        if payout > 0 { XPChipManager.shared.addXP(20) } else { XPChipManager.shared.addXP(10) }
+        // Award XP based on outcome: Win = 3 XP, Push = 2 XP, Loss = 1 XP
+        if payout > 0 { 
+            XPChipManager.shared.addXP(3) // Win
+        } else if payout == 0 { 
+            XPChipManager.shared.addXP(2) // Push
+        } else { 
+            XPChipManager.shared.addXP(1) // Loss
+        }
         if XPChipManager.shared.userChips <= 0 { gameState.showZeroChipsOverlay = true }
 
         gameState.playerBet = 0

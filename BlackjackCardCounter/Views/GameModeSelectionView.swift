@@ -153,33 +153,32 @@ struct QuizModeView: View {
                 .padding()
                 
                 // Claim Reward Button
-                if showClaimReward {
-                    Button(action: {
-                        claimReward()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "gift.fill")
-                                .font(.title2)
-                            Text("Claim Reward")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(hex: "FFD700"), Color(hex: "FFA500")]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .cornerRadius(12)
-                        .shadow(color: Color(hex: "FFD700").opacity(0.5), radius: 8, x: 0, y: 4)
+                Button(action: {
+                    claimReward()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gift.fill")
+                            .font(.title2)
+                        Text("Claim Reward")
+                            .font(.title3)
+                            .fontWeight(.bold)
                     }
-                    .transition(.scale.combined(with: .opacity))
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showClaimReward)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(hex: "FFD700"), Color(hex: "FFA500")]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(12)
+                    .shadow(color: Color(hex: "FFD700").opacity(0.5), radius: 8, x: 0, y: 4)
                 }
+                .scaleEffect(showClaimReward ? 1.0 : 0.1)
+                .opacity(showClaimReward ? 1.0 : 0.0)
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showClaimReward)
                 
                 Spacer()
                 
