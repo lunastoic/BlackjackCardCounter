@@ -33,6 +33,8 @@ class BlackjackGameState: ObservableObject {
     
     // Animation state for RegularModeView
     @Published var isDealing: Bool = false
+    @Published var isProcessingAction: Bool = false
+    @Published var lastActionTime: Date = Date()
     @Published var deckFrame: CGRect = .zero
     @Published var deckPosition: CGPoint = .zero
     @Published var animatingCards: [UUID: Card] = [:]
@@ -135,6 +137,8 @@ class BlackjackGameState: ObservableObject {
         betChips = []
         lastBet = nil
         isDealing = false
+        isProcessingAction = false
+        lastActionTime = Date()
         deckFrame = .zero
         deckPosition = .zero
         animatingCards.removeAll()
@@ -171,6 +175,8 @@ class BlackjackGameState: ObservableObject {
         dealtPlayerCards = []
         dealtDealerCards = []
         isDealing = false
+        isProcessingAction = false
+        lastActionTime = Date()
         animatingCards.removeAll()
         animatingCardPositions.removeAll()
         animatingCardScales.removeAll()

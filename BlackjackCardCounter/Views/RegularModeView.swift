@@ -292,20 +292,24 @@ struct RegularModeView: View {
                             )
                         }
 
-                        if gameState.isPlayerTurn && gameState.playerHand.count >= 2 {
-                            // Check if current active hand has blackjack (don't show buttons if so)
+                                                if gameState.isPlayerTurn && gameState.playerHand.count >= 2 {
+                            // Check if current active hand has blackjack or is busted (don't show buttons if so)
                             let activeHasBlackjack = gameState.isSplit && 
                                 gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
                             
-                            if !activeHasBlackjack {
-                        BlackjackActionButtons(
-                            gameState: gameState,
-                            gameEngine: gameEngine,
-                            showStrategyHints: false,
-                            getPerfectStrategyAction: { nil }
-                        )
+                            let playerBusted = gameState.isSplit ? 
+                                gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
+                                gameEngine.isBust(gameState.playerHand)
+                            
+                            if !activeHasBlackjack && !playerBusted {
+                                BlackjackActionButtons(
+                                    gameState: gameState,
+                                    gameEngine: gameEngine,
+                                    showStrategyHints: false,
+                                    getPerfectStrategyAction: { nil }
+                                )
                             }
-                    }
+                        }
                     
                     Spacer()
                 }

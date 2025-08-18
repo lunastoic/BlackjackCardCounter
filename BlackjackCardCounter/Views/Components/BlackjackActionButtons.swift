@@ -17,8 +17,8 @@ struct BlackjackActionButtons: View {
                 color1: "ff8800",
                 color2: "ffb300",
                 isEnabled: {
-                    let canDoubleDown = gameState.canDoubleDown
-                    print("🎲 Double Down button check: canDoubleDown=\(canDoubleDown), playerHand.count=\(gameState.playerHand.count)")
+                    let canDoubleDown = gameState.canDoubleDown && !gameState.isProcessingAction
+                    print("🎲 Double Down button check: canDoubleDown=\(gameState.canDoubleDown), processing=\(gameState.isProcessingAction), final=\(canDoubleDown)")
                     return canDoubleDown
                 }(),
                 action: {
@@ -33,7 +33,11 @@ struct BlackjackActionButtons: View {
                 systemImage: "hand.point.up.left.fill",
                 color1: "02a10f",
                 color2: "02a10f",
-                action: { gameEngine.hitAction(gameState: gameState) },
+                isEnabled: !gameState.isProcessingAction && Date().timeIntervalSince(gameState.lastActionTime) >= 0.6,
+                action: { 
+                    print("🎯 Hit button tapped")
+                    gameEngine.hitAction(gameState: gameState) 
+                },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Hit"
             )
             
@@ -42,6 +46,7 @@ struct BlackjackActionButtons: View {
                 systemImage: "hand.raised.fill",
                 color1: "b80802",
                 color2: "b80802",
+                isEnabled: !gameState.isProcessingAction,
                 action: { gameEngine.standAction(gameState: gameState) },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Stand"
             )
@@ -52,9 +57,9 @@ struct BlackjackActionButtons: View {
                 color1: "2193b0",
                 color2: "6dd5ed",
                 isEnabled: {
-                    let canSplit = gameState.canSplit
+                    let canSplit = gameState.canSplit && !gameState.isProcessingAction
                     let handRanks = gameState.playerHand.map { $0.rank.rawValue }
-                    print("🃏 Split button check: canSplit=\(canSplit), playerHand=\(handRanks)")
+                    print("🃏 Split button check: canSplit=\(gameState.canSplit), processing=\(gameState.isProcessingAction), final=\(canSplit)")
                     return canSplit
                 }(),
                 action: {

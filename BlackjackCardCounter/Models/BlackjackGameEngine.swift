@@ -107,34 +107,76 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     // MARK: - Actions
-    func hitAction(gameState: BlackjackGameState) {
-        guard gameState.deck.count > 0 else { return }
+        func hitAction(gameState: BlackjackGameState) {
+        // Prevent rapid button tapping with multiple checks
+        let now = Date()
+        let timeSinceLastAction = now.timeIntervalSince(gameState.lastActionTime)
         
+        guard gameState.deck.count > 0, 
+              !gameState.isProcessingAction,
+              timeSinceLastAction >= 0.6 else { 
+            print("🎯 hitAction: BLOCKED - processing=\(gameState.isProcessingAction), timeSince=\(timeSinceLastAction)")
+            return 
+        }
+        
+        gameState.isProcessingAction = true
+        gameState.lastActionTime = now
+        print("🎯 hitAction: Processing locked at \(now)")
+
         if gameState.isSplit {
             let newCard = gameState.deck.removeFirst()
             gameState.splitHands[gameState.activeHandIndex].append(newCard)
             gameState.runningCount += newCard.countValue
             
-            if isBust(gameState.splitHands[gameState.activeHandIndex]) {
+            // Check for bust immediately on split hand
+            let splitHandBusted = isBust(gameState.splitHands[gameState.activeHandIndex])
+            if splitHandBusted {
+                print("🎯 Split hand busted with \(handValue(gameState.splitHands[gameState.activeHandIndex])) - proceeding to next hand")
+            }
+            
+            // Add a delay before unlocking to prevent rapid tapping
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                gameState.isProcessingAction = false
+                print("🎯 hitAction: Split processing unlocked")
+            }
+            
+            if splitHandBusted {
                 nextSplitHandOrDealer(gameState: gameState)
             } else {
                 // Check if hand has 21 and should auto-advance
                 checkSplitHandAutoAdvance(gameState: gameState)
             }
-        } else {
+                } else {
             let newCard = gameState.deck.removeFirst()
             gameState.playerHand.append(newCard)
             gameState.runningCount += newCard.countValue
-            
+
+            // Check for bust immediately to hide action buttons
+            let playerBusted = isBust(gameState.playerHand)
+            if playerBusted {
+                print("🎯 Player busted with \(handValue(gameState.playerHand)) - hiding buttons")
+                gameState.isPlayerTurn = false // This will hide the action buttons immediately
+            }
+
             if let cb = hitAnimationCallback {
-                cb(newCard, true) { gameState.dealtPlayerCards.append(newCard) }
+                cb(newCard, true) { 
+                    gameState.dealtPlayerCards.append(newCard)
+                    // Unlock after animation completes
+                    gameState.isProcessingAction = false
+                    print("🎯 hitAction: Animation processing unlocked")
+                }
             } else {
                 withAnimation(.easeOut(duration: 0.3)) {
                     gameState.dealtPlayerCards.append(newCard)
                 }
+                // Unlock after animation delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    gameState.isProcessingAction = false
+                    print("🎯 hitAction: Fallback processing unlocked")
+                }
             }
-            
-            if isBust(gameState.playerHand) {
+
+            if playerBusted {
                 revealDealerCard(gameState: gameState) {
                     self.endPlayerTurn(gameState: gameState, playerBusted: true)
                 }

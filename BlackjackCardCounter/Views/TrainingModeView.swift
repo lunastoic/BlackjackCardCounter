@@ -236,11 +236,15 @@ struct TrainingModeView: View {
                         
                         // Show result message after round
                         if gameState.showNextHand && gameState.isPlayerTurn {
-                            // Check if current active hand has blackjack (don't show buttons if so)
+                            // Check if current active hand has blackjack or is busted (don't show buttons if so)
                             let activeHasBlackjack = gameState.isSplit && 
                                 gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
                             
-                            if !activeHasBlackjack {
+                            let playerBusted = gameState.isSplit ? 
+                                gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
+                                gameEngine.isBust(gameState.playerHand)
+                            
+                            if !activeHasBlackjack && !playerBusted {
                             BlackjackActionButtons(
                                 gameState: gameState,
                                 gameEngine: gameEngine,
