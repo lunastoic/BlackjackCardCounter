@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "LunaLux.png",
+      "filename" : "perhapsLogo.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "LunaLux 1.png",
+      "filename" : "perhapsLogo 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "LunaLux 2.png",
+      "filename" : "perhapsLogo 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

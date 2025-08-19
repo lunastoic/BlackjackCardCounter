@@ -834,6 +834,7 @@ struct RegularModeSettingsTabView: View {
         }
         .padding(20)
     }
+
 }
 
 #Preview {

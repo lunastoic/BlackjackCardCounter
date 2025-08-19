@@ -389,6 +389,7 @@ class BlackjackGameEngine: ObservableObject {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { dealNextCard() }
     }
+
     
     func endPlayerTurn(gameState: BlackjackGameState, playerBusted: Bool) {
         gameState.isPlayerTurn = false
@@ -430,39 +431,46 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     private func handleGameResult(gameState: BlackjackGameState, payout: Int) {
-        let before = XPChipManager.shared.userChips
+        // Check if training mode is enabled - skip payouts if it is
+        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
         
-        // Calculate chips to credit based on result:
-        // - Win (payout > 0): Return original bet + winnings
-        // - Push (payout = 0): Return original bet only
-        // - Loss (payout < 0): Return nothing (bet is lost)
-        let credited: Int
-        if payout > 0 {
-            credited = payout + gameState.playerBet  // Win: bet + winnings
-        } else if payout == 0 {
-            credited = gameState.playerBet  // Push: return bet only
-        } else {
-            credited = 0  // Loss: return nothing
-        }
-        
-        XPChipManager.shared.updateChips(credited)
-        let after = XPChipManager.shared.userChips
-        let actualChange = after - before
+        if !trainingModeEnabled {
+            let before = XPChipManager.shared.userChips
+            
+            // Calculate chips to credit based on result:
+            // - Win (payout > 0): Return original bet + winnings
+            // - Push (payout = 0): Return original bet only
+            // - Loss (payout < 0): Return nothing (bet is lost)
+            let credited: Int
+            if payout > 0 {
+                credited = payout + gameState.playerBet  // Win: bet + winnings
+            } else if payout == 0 {
+                credited = gameState.playerBet  // Push: return bet only
+            } else {
+                credited = 0  // Loss: return nothing
+            }
+            
+            XPChipManager.shared.updateChips(credited)
+            let after = XPChipManager.shared.userChips
+            let actualChange = after - before
 
-        print("💰 Game result: payout=\(payout), playerBet=\(gameState.playerBet), credited=\(credited)")
-        gameState.debugPayoutMessage = "Expected: +$\(credited), Actual: +$\(actualChange)"
-        gameState.showDebugPayout = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { gameState.showDebugPayout = false }
-        
-        // Award XP based on outcome: Win = 3 XP, Push = 2 XP, Loss = 1 XP
-        if payout > 0 {
-            XPChipManager.shared.addXP(3) // Win
-        } else if payout == 0 { 
-            XPChipManager.shared.addXP(2) // Push
+            print("💰 Game result: payout=\(payout), playerBet=\(gameState.playerBet), credited=\(credited)")
+            gameState.debugPayoutMessage = "Expected: +$\(credited), Actual: +$\(actualChange)"
+            gameState.showDebugPayout = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { gameState.showDebugPayout = false }
+            
+            // Award XP based on outcome: Win = 3 XP, Push = 2 XP, Loss = 1 XP
+            if payout > 0 {
+                XPChipManager.shared.addXP(3) // Win
+            } else if payout == 0 { 
+                XPChipManager.shared.addXP(2) // Push
+            } else {
+                XPChipManager.shared.addXP(1) // Loss
+            }
+            if XPChipManager.shared.userChips <= 0 { gameState.showZeroChipsOverlay = true }
         } else {
-            XPChipManager.shared.addXP(1) // Loss
+            print("🎓 Training Mode: No payouts or XP awarded - training mode enabled")
         }
-        if XPChipManager.shared.userChips <= 0 { gameState.showZeroChipsOverlay = true }
         
         gameState.playerBet = 0
         gameState.betChips = []
@@ -518,8 +526,23 @@ class BlackjackGameEngine: ObservableObject {
                 if gameState.playerHand.count == 2 && 
                    ((gameState.playerHand[0].rank == .ace && gameState.playerHand[1].rank.value == 10) || 
                     (gameState.playerHand[1].rank == .ace && gameState.playerHand[0].rank.value == 10)) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.endPlayerTurn(gameState: gameState, playerBusted: false)
+                    
+                    let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+                    print("🎓 Player has blackjack! trainingModeEnabled=\(trainingModeEnabled)")
+                    
+                    if trainingModeEnabled {
+                        // In training mode, reveal dealer card first so we can see what they had
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.revealDealerCard(gameState: gameState) {
+                                // After revealing dealer card, end the hand
+                                self.endPlayerTurn(gameState: gameState, playerBusted: false)
+                            }
+                        }
+                    } else {
+                        // In regular mode, immediately end the hand (original behavior)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.endPlayerTurn(gameState: gameState, playerBusted: false)
+                        }
                     }
                 }
                 return
