@@ -427,11 +427,25 @@ class BlackjackGameEngine: ObservableObject {
     
     private func handleGameResult(gameState: BlackjackGameState, payout: Int) {
         let before = XPChipManager.shared.userChips
-        let credited = payout > 0 ? payout + gameState.playerBet : 0
+        
+        // Calculate chips to credit based on result:
+        // - Win (payout > 0): Return original bet + winnings
+        // - Push (payout = 0): Return original bet only
+        // - Loss (payout < 0): Return nothing (bet is lost)
+        let credited: Int
+        if payout > 0 {
+            credited = payout + gameState.playerBet  // Win: bet + winnings
+        } else if payout == 0 {
+            credited = gameState.playerBet  // Push: return bet only
+        } else {
+            credited = 0  // Loss: return nothing
+        }
+        
         XPChipManager.shared.updateChips(credited)
         let after = XPChipManager.shared.userChips
         let actualChange = after - before
 
+        print("💰 Game result: payout=\(payout), playerBet=\(gameState.playerBet), credited=\(credited)")
         gameState.debugPayoutMessage = "Expected: +$\(credited), Actual: +$\(actualChange)"
         gameState.showDebugPayout = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { gameState.showDebugPayout = false }
@@ -509,7 +523,10 @@ class BlackjackGameEngine: ObservableObject {
             
             var card: Card
             let forcePairs = UserDefaults.standard.bool(forKey: "debugForcePairs")
+            let force10s = UserDefaults.standard.bool(forKey: "debugForce10s")
+            
             if forcePairs && (i == 0 || i == 2) {
+                // Force pairs logic (existing)
                 if i == 0 {
                     card = localDeck.removeFirst()
                 } else {
@@ -517,6 +534,16 @@ class BlackjackGameEngine: ObservableObject {
                     if let idx = localDeck.firstIndex(where: { $0.rank.value == first.rank.value }) {
                         card = localDeck.remove(at: idx)
                     } else { card = localDeck.removeFirst() }
+                }
+            } else if force10s {
+                // Force 10-value cards (10, J, Q, K) for all dealt cards
+                let tenValueRanks: [CardRank] = [.ten, .jack, .queen, .king]
+                if let idx = localDeck.firstIndex(where: { tenValueRanks.contains($0.rank) }) {
+                    card = localDeck.remove(at: idx)
+                    print("🎲 Debug: Forced 10-value card: \(card.rank.rawValue)")
+                } else {
+                    card = localDeck.removeFirst()
+                    print("🎲 Debug: No 10-value cards available, using: \(card.rank.rawValue)")
                 }
             } else {
                 card = localDeck.removeFirst()

@@ -104,6 +104,24 @@ struct SettingsView: View {
                                 .labelsHidden()
                             }
                             
+                            // Force 10s Toggle for High Value Testing
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Force 10s (High Value Testing)")
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                    Text("Player and dealer get 10-value cards (10, J, Q, K)")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                                Toggle("", isOn: .init(
+                                    get: { UserDefaults.standard.bool(forKey: "debugForce10s") },
+                                    set: { UserDefaults.standard.set($0, forKey: "debugForce10s") }
+                                ))
+                                .labelsHidden()
+                            }
+                            
                             Divider()
                                 .background(Color.white.opacity(0.3))
                                 .padding(.vertical, 5)
