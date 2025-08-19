@@ -198,6 +198,10 @@ class BlackjackGameEngine: ObservableObject {
             gameState.playerBet *= 2
             gameState.doubledDown = true
             
+            // End player's turn immediately - no more actions allowed after double down
+            gameState.isPlayerTurn = false
+            print("🎲 Double Down executed - player turn ended, buttons hidden")
+            
             let newCard = gameState.deck.removeFirst()
             gameState.playerHand.append(newCard)
             gameState.runningCount += newCard.countValue

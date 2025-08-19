@@ -315,6 +315,7 @@ struct TrainingModeView: View {
                             .shadow(radius: 6)
                     }
                     .padding(.leading, 8)
+                    .offset(y: -30)
                     
                     Spacer()
                     

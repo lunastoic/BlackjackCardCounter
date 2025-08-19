@@ -49,6 +49,9 @@ struct RegularModeView: View {
     // Misc
     @State private var discardPile: [Card] = []
     @State private var showZeroChipsOverlay = false
+    @State private var showSettings = false
+    @State private var selectedSettingsTab: Int = 0
+    @AppStorage("regularDecks") private var numberOfDecks: Int = 6
     
     var body: some View {
         GeometryReader { tableGeo in
@@ -315,6 +318,17 @@ struct RegularModeView: View {
                 }
             }
             
+            // Simple settings button
+            Button(action: { showSettings = true }) {
+                Image(systemName: "gearshape.fill")
+                    .font(.title)
+                    .foregroundColor(.white)
+                    .padding()
+                    .shadow(radius: 6)
+            }
+            .position(x: UIScreen.main.bounds.width - 40, y: 175)
+            
+            
                 // ---- Animated overlay (move + flip) ----
             ForEach(Array(gameState.animatingCards.keys), id: \.self) { cardId in
                     if let card = gameState.animatingCards[cardId],
@@ -410,7 +424,7 @@ struct RegularModeView: View {
                     }
                 }
             }
-            .coordinateSpace(name: "table")
+        .coordinateSpace(name: "table")
         .onAppear {
                 tableSize = tableGeo.size
                 _ = UIImage(named: "DeckCover")
@@ -466,6 +480,17 @@ struct RegularModeView: View {
             }
             .overlay {
                 if showZeroChipsOverlay { ZeroChipsOverlay(isPresented: $showZeroChipsOverlay) }
+                
+                // Settings overlay (simplified for Regular Mode)
+                if showSettings {
+                    RegularModeSettingsOverlay(
+                        showSettings: $showSettings,
+                        selectedSettingsTab: $selectedSettingsTab,
+                        numberOfDecks: $numberOfDecks,
+                        gameState: gameState,
+                        gameEngine: gameEngine
+                    )
+                }
             }
         }
     }
@@ -697,6 +722,117 @@ struct RegularModeView: View {
         }
 
         startCollect(at: 0)
+    }
+}
+
+// MARK: - Regular Mode Settings Overlay
+struct RegularModeSettingsOverlay: View {
+    @Binding var showSettings: Bool
+    @Binding var selectedSettingsTab: Int
+    @Binding var numberOfDecks: Int
+    let gameState: BlackjackGameState
+    let gameEngine: BlackjackGameEngine
+    
+    var body: some View {
+        Color.black.opacity(0.5)
+            .ignoresSafeArea()
+            .onTapGesture { showSettings = false }
+        
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                // Tab bar
+                HStack(spacing: 0) {
+                    Button(action: { selectedSettingsTab = 0 }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title2)
+                            Text("Settings")
+                                .font(.headline)
+                        }
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(selectedSettingsTab == 0 ? Color(hex: "23272a") : Color.clear)
+                        .foregroundColor(selectedSettingsTab == 0 ? .yellow : .white)
+                        .opacity(selectedSettingsTab == 0 ? 1.0 : 0.5)
+                    }
+                    
+                    Button(action: { selectedSettingsTab = 1 }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trophy.fill")
+                                .font(.title2)
+                            Text("Achievements")
+                                .font(.headline)
+                        }
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(selectedSettingsTab == 1 ? Color(hex: "23272a") : Color.clear)
+                        .foregroundColor(selectedSettingsTab == 1 ? .yellow : .white)
+                        .opacity(selectedSettingsTab == 1 ? 1.0 : 0.5)
+                    }
+                }
+                .background(Color(hex: "1a1a2e").opacity(0.95))
+                
+                // Tab content
+                if selectedSettingsTab == 0 {
+                    RegularModeSettingsTabView(
+                        numberOfDecks: $numberOfDecks,
+                        showSettings: $showSettings,
+                        gameState: gameState,
+                        gameEngine: gameEngine
+                    )
+                } else {
+                    AchievementsTabView()
+                }
+            }
+            .background(Color(hex: "16213e").opacity(0.95))
+            .cornerRadius(24)
+            .shadow(radius: 20)
+            .frame(maxWidth: 340)
+            .offset(y: -UIScreen.main.bounds.height * 0.18)
+        }
+    }
+}
+
+// MARK: - Regular Mode Settings Tab View
+struct RegularModeSettingsTabView: View {
+    @Binding var numberOfDecks: Int
+    @Binding var showSettings: Bool
+    let gameState: BlackjackGameState
+    let gameEngine: BlackjackGameEngine
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 16) {
+                HStack {
+                    Text("Decks:")
+                        .foregroundColor(.white)
+                        .font(.headline)
+                    Picker("Decks", selection: $numberOfDecks) {
+                        Text("1").tag(1)
+                        Text("2").tag(2)
+                        Text("4").tag(4)
+                        Text("6").tag(6)
+                        Text("8").tag(8)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(width: 220)
+                    .onChange(of: numberOfDecks) { _ in
+                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                    }
+                }
+            }
+            
+            Button(action: { showSettings = false }) {
+                Text("Close")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 10)
+                    .background(Color(hex: "ff0000"))
+                    .cornerRadius(12)
+            }
+        }
+        .padding(20)
     }
 }
 
