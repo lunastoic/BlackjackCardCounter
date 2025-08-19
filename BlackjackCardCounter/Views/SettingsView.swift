@@ -151,10 +151,11 @@ struct SettingsView: View {
                                 .foregroundColor(.green.opacity(0.8))
                         }
                     }
-                }
-                .padding()
-            }
+                            }
+            .padding()
         }
+        .disableDynamicType()
+    }
         .navigationTitle("Settings")
     }
 }

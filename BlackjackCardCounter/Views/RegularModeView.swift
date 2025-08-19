@@ -143,6 +143,7 @@ struct RegularModeView: View {
                     VStack(spacing: 8) {
                             Text("Dealer").font(.headline).foregroundColor(.white)
                             Text(dealerValueLabel()).font(.subheadline).foregroundColor(.yellow)
+                                .offset(y: -6)
                         
                             // Hidden placeholders to keep layout stable
                         HStack(spacing: 8) {
@@ -163,24 +164,26 @@ struct RegularModeView: View {
                     
                         // Player
                     VStack(spacing: 8) {
-                            Text("Player").font(.headline).foregroundColor(.white)
+                            Text("Player").font(.fixedSystem(size: 17, weight: .semibold)).foregroundColor(.white)
 
                             if gameState.isSplit {
                                 // Split labels + hidden placeholders only (real cards are drawn in overlay)
                                 VStack(spacing: 4) {
                                     Text(gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]))
-                                        .font(.subheadline).foregroundColor(.yellow)
+                                        .font(.fixedSystem(size: 15, weight: .regular)).foregroundColor(.yellow)
+                                        .offset(y: -6)
 
                                     HStack(spacing: 24) {
                                         ForEach(gameState.splitHands.indices, id: \.self) { idx in
                                             VStack {
                                                 HStack {
                                                     Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
-                                                        .font(.caption)
+                                                        .font(.fixedSystem(size: 12, weight: .regular))
                                                         .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
                                                     Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
-                                                        .font(.caption)
+                                                        .font(.fixedSystem(size: 12, weight: .regular))
                             .foregroundColor(.yellow)
+                                                        .offset(y: -6)
                                                 }
 
                                                 // Hidden placeholder rows (keep layout)
@@ -211,6 +214,7 @@ struct RegularModeView: View {
                                 }
                             } else {
                                 Text(playerValueLabel()).font(.subheadline).foregroundColor(.yellow)
+                                    .offset(y: -6)
 
                                 // Hidden placeholders for non-split player
                         HStack(spacing: 8) {
@@ -326,7 +330,7 @@ struct RegularModeView: View {
                     .padding()
                     .shadow(radius: 6)
             }
-            .position(x: UIScreen.main.bounds.width - 40, y: 175)
+            .position(x: UIScreen.main.bounds.width - 40, y: 185)
             
             
                 // ---- Animated overlay (move + flip) ----
@@ -493,6 +497,7 @@ struct RegularModeView: View {
                 }
             }
         }
+        .disableDynamicType()
     }
     
     // MARK: - Labels
@@ -559,11 +564,11 @@ struct RegularModeView: View {
                 
                 ZStack {
                     Text(String(chars[i]))
-                        .font(.system(size: fontSize + 4, weight: .bold))
+                        .font(.fixedSystem(size: fontSize + 4, weight: .bold))
                         .foregroundColor(.yellow.opacity(0.15))
                         .position(x: x, y: y)
                     Text(String(chars[i]))
-                        .font(.system(size: fontSize, weight: .bold))
+                        .font(.fixedSystem(size: fontSize, weight: .bold))
                         .foregroundColor(.white.opacity(0.4))
                         .position(x: x, y: y)
                 }

@@ -27,10 +27,10 @@ struct DealerHandView: View {
         VStack(spacing: 8) {
             HStack {
                 Text("Dealer")
-                    .font(.headline)
+                    .font(.fixedSystem(size: 17, weight: .semibold))
                     .foregroundColor(.white)
                 Text(gameState.isPlayerTurn ? String(gameEngine.handValue([gameState.dealerHand.first].compactMap { $0 })) : gameEngine.getHandValueText(gameState.dealerHand))
-                    .font(.subheadline)
+                    .font(.fixedSystem(size: 15, weight: .regular))
                     .foregroundColor(.yellow)
             }
             
@@ -64,10 +64,10 @@ struct PlayerHandView: View {
         VStack(spacing: 8) {
             HStack {
                 Text("Player")
-                    .font(.headline)
+                    .font(.fixedSystem(size: 17, weight: .semibold))
                     .foregroundColor(.white)
                 Text(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand))
-                    .font(.subheadline)
+                    .font(.fixedSystem(size: 15, weight: .regular))
                     .foregroundColor(.yellow)
             }
             
@@ -78,6 +78,7 @@ struct PlayerHandView: View {
             }
         }
         .frame(height: 240)
+        .disableDynamicType()
     }
 }
 

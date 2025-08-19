@@ -37,8 +37,7 @@ struct MapSelectionView: View {
                 GameHeaderView()
                 
                 Text("Select Map")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.fixedSystem(size: 27, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.top, 20)
 
@@ -80,6 +79,7 @@ struct MapSelectionView: View {
             .padding(.horizontal, 0)
             .frame(maxWidth: 800)
             .frame(maxWidth: .infinity)
+            .disableDynamicType()
         }
     }
 }
@@ -168,8 +168,7 @@ struct MapCard: View {
                     .zIndex(1000)
 
                     Text(map.name)
-                        .font(.headline)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 19, weight: .bold))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .opacity(isUnlocking ? 0 : 1)
@@ -192,8 +191,7 @@ struct MapCard: View {
                     // Top: name + image with a 2× thicker black border around the image
                     VStack(spacing: 8) {
                         Text(map.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(.fixedSystem(size: 20, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                             .padding(.top, 30)
@@ -245,18 +243,17 @@ struct MapCard: View {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Training Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Learn with visuals and tutorials")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -275,18 +272,17 @@ struct MapCard: View {
                                 NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Regular Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Classic casino experience")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -305,18 +301,17 @@ struct MapCard: View {
                                 NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Quiz Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Test your knowledge")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -343,18 +338,17 @@ struct MapCard: View {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Training Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Learn with visuals and tutorials")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -373,18 +367,17 @@ struct MapCard: View {
                                 NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Regular Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Classic casino experience")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -403,18 +396,17 @@ struct MapCard: View {
                                 NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Quiz Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Test your knowledge")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -441,18 +433,17 @@ struct MapCard: View {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Training Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Learn with visuals and tutorials")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -471,18 +462,17 @@ struct MapCard: View {
                                 NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Regular Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Classic casino experience")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -501,18 +491,17 @@ struct MapCard: View {
                                 NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Quiz Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Test your knowledge")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -534,23 +523,22 @@ struct MapCard: View {
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                                            } else if map.name == "Titan Methane Mirage" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
+                                                                } else if map.name == "Titan Methane Mirage" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Training Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Learn with visuals and tutorials")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -560,27 +548,26 @@ struct MapCard: View {
                                         .foregroundColor(.gray)
                                 }
                                 .padding()
-                                .background(
+                                                                .background(
                                     RoundedRectangle(cornerRadius: 15)
                                         .fill(Color.green.opacity(0.8))
                                         .shadow(radius: 5)
                                 )
-                            }
+                                }
                             NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Regular Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Classic casino experience")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -599,18 +586,17 @@ struct MapCard: View {
                             NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Quiz Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Test your knowledge")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -632,23 +618,22 @@ struct MapCard: View {
                         .opacity(1.0)
                         .scaleEffect(1.0)
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                                            } else if map.name == "Kepler Fortune" {
-                        VStack(spacing: 14) {
-                            NavigationLink(destination: TrainingModeView(map: map)) {
+                                                                } else if map.name == "Kepler Fortune" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "book.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Training Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Learn with visuals and tutorials")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -667,18 +652,17 @@ struct MapCard: View {
                             NavigationLink(destination: RegularModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Regular Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Classic casino experience")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     
@@ -697,18 +681,17 @@ struct MapCard: View {
                             NavigationLink(destination: QuizModeView(map: map)) {
                                 HStack {
                                     Image(systemName: "questionmark.circle.fill")
-                                        .font(.title)
+                                        .font(.fixedSystem(size: 23, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 50)
                                     
                                     VStack(alignment: .leading) {
                                         Text("Quiz Mode")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
+                                            .font(.fixedSystem(size: 15, weight: .bold))
                                             .foregroundColor(.white)
                                         
                                         Text("Test your knowledge")
-                                            .font(.caption)
+                                            .font(.fixedSystem(size: 11, weight: .regular))
                                             .foregroundColor(.white)
                                     }
                                     

@@ -71,6 +71,7 @@ struct BlackjackActionButtons: View {
         }
         .frame(maxWidth: 440)
         .padding(.top, 12)
+        .disableDynamicType()
     }
 }
 
@@ -88,10 +89,9 @@ struct PremiumActionButton: View {
         Button(action: { if isEnabled { action() } }) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.title3)
+                    .font(.fixedSystem(size: 16, weight: .semibold))
                 Text(title)
-                    .font(.headline)
-                    .fontWeight(.semibold)
+                    .font(.fixedSystem(size: 14, weight: .semibold))
             }
             .foregroundColor(isEnabled ? .white : .gray)
             .frame(maxWidth: .infinity, minHeight: 44)

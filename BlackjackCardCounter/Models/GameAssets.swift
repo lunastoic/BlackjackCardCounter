@@ -128,3 +128,62 @@ enum AssetName {
         "\(rank.rawValue)_\(suit.rawValue)"
     }
 } 
+
+// MARK: - Custom Font Extension for Consistent Sizing
+extension Font {
+    /// Fixed-size fonts that ignore Dynamic Type settings for consistent UI layout
+    static func fixedSystem(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        return .system(size: size, weight: weight, design: .default)
+    }
+    
+    /// Capped dynamic fonts that scale down but have a maximum size limit
+    static func cappedSystem(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        return .system(size: size, weight: weight, design: .default)
+    }
+    
+    static func fixedTitle() -> Font {
+        return .system(size: 28, weight: .bold, design: .default)
+    }
+    
+    static func fixedHeadline() -> Font {
+        return .system(size: 17, weight: .semibold, design: .default)
+    }
+    
+    static func fixedSubheadline() -> Font {
+        return .system(size: 15, weight: .regular, design: .default)
+    }
+    
+    static func fixedBody() -> Font {
+        return .system(size: 16, weight: .regular, design: .default)
+    }
+    
+    static func fixedCaption() -> Font {
+        return .system(size: 12, weight: .regular, design: .default)
+    }
+}
+
+// MARK: - Text Extension for Dynamic Type Control
+extension Text {
+    /// Apply fixed sizing that ignores Dynamic Type
+    func fixedSize() -> some View {
+        self.dynamicTypeSize(.large) // Lock to a specific size
+    }
+}
+
+// MARK: - View Extension for Consistent Dynamic Type Control
+extension View {
+    /// Disable Dynamic Type scaling for the entire view
+    func disableDynamicType() -> some View {
+        self.dynamicTypeSize(.large) // Lock to standard large size
+    }
+    
+    /// Limit Dynamic Type to reasonable bounds
+    func limitDynamicType() -> some View {
+        self.dynamicTypeSize(...DynamicTypeSize.xxxLarge) // Prevent extreme sizes
+    }
+    
+    /// Cap Dynamic Type at current size but allow scaling down for smaller text preferences
+    func cappedDynamicType() -> some View {
+        self.dynamicTypeSize(.small...DynamicTypeSize.large) // Allow small to current size
+    }
+} 

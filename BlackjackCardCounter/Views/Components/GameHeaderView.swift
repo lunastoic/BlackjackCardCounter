@@ -19,10 +19,10 @@ struct GameHeaderView: View {
             // Chips Counter
             HStack(spacing: 4) {
                 Text("Chips:")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.fixedSystem(size: 19, weight: .bold))
                     .foregroundColor(.yellow)
                 Text("\(xpManager.userChips)")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.fixedSystem(size: 20, weight: .bold))
                     .foregroundColor(.white)
             }
             .padding(.horizontal, 12)
@@ -42,7 +42,7 @@ struct GameHeaderView: View {
                         .fill(Color(hex: "0f3460"))
                         .frame(width: 32, height: 32)
                     Text("\(xpManager.userLevel)")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.fixedSystem(size: 17, weight: .bold))
                         .foregroundColor(.white)
                 }
                 
@@ -58,7 +58,7 @@ struct GameHeaderView: View {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(
                                 LinearGradient(
-                                    gradient: Gradient(colors: [Color(hex: "43ea7a"), Color(hex: "00c853"), Color(hex: "2193b0")]),
+                                    gradient: Gradient(colors: [Color(hex: "2193b0"), Color(hex: "00c853"), Color(hex: "43ea7a")]),
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -76,6 +76,7 @@ struct GameHeaderView: View {
         }
         .padding(.horizontal)
         .padding(.top, 8)
+        .disableDynamicType()
         .onReceive(NotificationCenter.default.publisher(for: .xpChipDidChange)) { _ in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 isAnimatingXP = true

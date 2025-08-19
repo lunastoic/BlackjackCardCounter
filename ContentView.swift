@@ -11,7 +11,7 @@ struct ContentView: View {
                 VStack(spacing: 30) {
                     // Title
                     Text("Blackjack Card Counter")
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.fixedSystem(size: 40, weight: .bold))
                         .foregroundColor(.white)
                     // Home screen image
                     Image("HouseDealer")
@@ -44,6 +44,7 @@ struct ContentView: View {
                 }
             )
         }
+        .disableDynamicType()
     }
 }
 
@@ -54,10 +55,9 @@ struct MenuButton: View {
     var body: some View {
         HStack {
             Image(systemName: systemImage)
-                .font(.title2)
+                .font(.fixedSystem(size: 20, weight: .semibold))
             Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(.fixedSystem(size: 20, weight: .semibold))
         }
         .foregroundColor(.white)
         .frame(maxWidth: .infinity)

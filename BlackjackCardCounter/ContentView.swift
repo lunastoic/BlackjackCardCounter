@@ -26,7 +26,7 @@ struct ContentView: View {
                     
                     // Title
                     Text("Blackjack Card Counter")
-                        .font(.system(size: 32, weight: .bold))
+                        .font(.fixedSystem(size: 35, weight: .bold))
                         .foregroundColor(.white)
                     
                     // Home screen image with rewards button overlay
@@ -76,6 +76,7 @@ struct ContentView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle()) // Force full screen on iPad
+        .disableDynamicType()
     }
 }
 
@@ -87,10 +88,9 @@ struct MenuButton: View {
     var body: some View {
         HStack {
             Image(systemName: systemImage)
-                .font(.title2)
+                .font(.fixedSystem(size: 20, weight: .semibold))
             Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(.fixedSystem(size: 20, weight: .semibold))
         }
         .foregroundColor(.white)
         .frame(maxWidth: 280)
@@ -139,8 +139,7 @@ struct RewardsButton: View {
     }
     var body: some View {
         Text("🎁 Rewards")
-            .font(.title2)
-            .fontWeight(.bold)
+            .font(.fixedSystem(size: 18, weight: .bold))
             .foregroundColor(.white)
             .padding(.vertical, 14)
             .padding(.horizontal, 60)

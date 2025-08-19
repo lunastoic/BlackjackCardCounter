@@ -9,7 +9,7 @@ struct BlackjackBettingView: View {
     var body: some View {
         VStack(spacing: 8) {
             Text("Betting Area")
-                .font(.subheadline)
+                .font(.fixedSystem(size: 15, weight: .regular))
                 .foregroundColor(.white)
             
             ZStack {
@@ -41,7 +41,7 @@ struct BlackjackBettingView: View {
                             bettingManager.returnBet(gameState: gameState)
                         }) {
                             Text("Return Bet")
-                                .font(.headline)
+                                .font(.fixedSystem(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
@@ -54,29 +54,26 @@ struct BlackjackBettingView: View {
             }
             
             Text("Bet: $\(gameState.playerBet)")
-                .font(.title2)
+                .font(.fixedSystem(size: 18, weight: .semibold))
                 .foregroundColor(.yellow)
             
             // Win/Lose/Push message
             if let result = gameState.resultMessage {
                 if gameState.lastPayout > 0 {
                     Text("Win $\(gameState.lastPayout * 2)")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(Color(hex: "00FF41"))
                         .multilineTextAlignment(.center)
                         .offset(y: -8)
                 } else if gameState.lastPayout < 0 {
                     Text("Lose -$\(-gameState.lastPayout)")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(Color(hex: "DC143C"))
                         .multilineTextAlignment(.center)
                         .offset(y: -8)
                 } else {
                     Text("Push")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(.yellow)
                         .multilineTextAlignment(.center)
                         .offset(y: -8)
@@ -84,6 +81,7 @@ struct BlackjackBettingView: View {
             }
         }
         .padding(.top, gameState.resultMessage == nil ? 24 : -16)
+        .disableDynamicType()
     }
 }
 
@@ -128,8 +126,7 @@ struct DealNextHandButtons: View {
                     bettingManager.redoBet(gameState: gameState)
                 }) {
                     Text("Redo Bet")
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color(hex: "ff9800").opacity(bettingManager.canRedoBet(gameState: gameState) ? 0.85 : 0.3))
@@ -151,8 +148,7 @@ struct DealNextHandButtons: View {
                     )
                 }) {
                     Text("Deal Cards")
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .font(.fixedSystem(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)
@@ -177,8 +173,7 @@ struct DealNextHandButtons: View {
                 )
             }) {
                 Text("Deal Cards")
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(.fixedSystem(size: 20, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)

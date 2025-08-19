@@ -267,21 +267,21 @@ struct TrainingModeView: View {
                         
                         // Show betting areas only if training mode is disabled
                         if !trainingModeEnabled {
-                            // Betting area
-                            BlackjackBettingView(
+                        // Betting area
+                        BlackjackBettingView(
+                            gameState: gameState,
+                            bettingManager: bettingManager,
+                            gameEngine: gameEngine
+                        )
+                        .disabled(gameState.isDealing)
+                        
+                        // Chips at the bottom (always visible before a hand is dealt or after a round is over)
+                        if !gameState.showNextHand {
+                            ChipSelectionView(
                                 gameState: gameState,
-                                bettingManager: bettingManager,
-                                gameEngine: gameEngine
+                                bettingManager: bettingManager
                             )
                             .disabled(gameState.isDealing)
-                            
-                            // Chips at the bottom (always visible before a hand is dealt or after a round is over)
-                            if !gameState.showNextHand {
-                                ChipSelectionView(
-                                    gameState: gameState,
-                                    bettingManager: bettingManager
-                                )
-                                .disabled(gameState.isDealing)
                             }
                         }
                         
@@ -481,7 +481,7 @@ struct TrainingModeView: View {
                 HStack {
                     Button(action: { showStrategyChart = true }) {
                         Image(systemName: "tablecells")
-                            .font(.title)
+                            .font(.fixedSystem(size: 28, weight: .regular))
                             .foregroundColor(.yellow)
                             .padding()
                             .background(Color.black.opacity(0.7))
@@ -495,7 +495,7 @@ struct TrainingModeView: View {
                     
                     Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
-                            .font(.title)
+                            .font(.fixedSystem(size: 28, weight: .regular))
                             .foregroundColor(.white)
                             .padding()
                             .shadow(radius: 6)
@@ -533,6 +533,7 @@ struct TrainingModeView: View {
         }
         .frame(maxWidth: 1000) // Limit width on larger screens
         .frame(maxWidth: .infinity) // Center the content
+        .disableDynamicType()
     }
     
     // State to prevent multiple auto-play actions
@@ -917,13 +918,13 @@ struct TrainingModeView: View {
                 ZStack {
                     // Golden border layer (larger, underneath)
                     Text(String(chars[i]))
-                        .font(.system(size: fontSize + 4, weight: .bold))
+                        .font(.fixedSystem(size: fontSize + 4, weight: .bold))
                         .foregroundColor(.yellow.opacity(0.15))
                         .position(x: x, y: y)
                     
                     // White text layer (smaller, on top)
                     Text(String(chars[i]))
-                        .font(.system(size: fontSize, weight: .bold))
+                        .font(.fixedSystem(size: fontSize, weight: .bold))
                         .foregroundColor(.white.opacity(0.4))
                         .position(x: x, y: y)
                 }
@@ -1182,7 +1183,7 @@ struct SettingsTabView: View {
                         get: { UserDefaults.standard.bool(forKey: "trainingModeEnabled") },
                         set: { UserDefaults.standard.set($0, forKey: "trainingModeEnabled") }
                     ))
-                    .labelsHidden()
+                        .labelsHidden()
                 }
             }
             
@@ -1338,7 +1339,7 @@ struct ArchText: View {
                 let y = height / 2 - archHeight * sin(progress * .pi) // Creates a smooth arch
                 
                 Text(String(chars[i]))
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.fixedSystem(size: 28, weight: .bold))
                     .foregroundColor(.white.opacity(0.25))
                     .position(x: x, y: y)
             }

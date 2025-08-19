@@ -67,12 +67,11 @@ struct GameModeButton: View {
             
             VStack(alignment: .leading) {
                 Text(title)
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(.fixedSystem(size: 15, weight: .bold))
                     .foregroundColor(.white)
                 
                 Text(description)
-                    .font(.caption)
+                    .font(.fixedSystem(size: 11, weight: .regular))
                     .foregroundColor(.white)
             }
             
