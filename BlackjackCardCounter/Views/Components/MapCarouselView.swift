@@ -104,6 +104,8 @@ private struct iOS16CarouselView: UIViewRepresentable {
     }
     
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        let previousSelectedIndex = context.coordinator.getCurrentSelectedIndex()
+        
         context.coordinator.updateData(
             maps: maps,
             selectedIndex: selectedIndex,
@@ -112,11 +114,13 @@ private struct iOS16CarouselView: UIViewRepresentable {
             onUnlock: onUnlock
         )
         
-        // Scroll to selected index if needed
-        DispatchQueue.main.async {
-            let indexPath = IndexPath(item: selectedIndex, section: 0)
-            if collectionView.numberOfItems(inSection: 0) > selectedIndex {
-                collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+        // Only scroll if the selected index actually changed (not just due to unlock state change)
+        if previousSelectedIndex != selectedIndex {
+            DispatchQueue.main.async {
+                let indexPath = IndexPath(item: selectedIndex, section: 0)
+                if collectionView.numberOfItems(inSection: 0) > selectedIndex {
+                    collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+                }
             }
         }
     }
@@ -175,6 +179,10 @@ private struct iOS16CarouselView: UIViewRepresentable {
         
         init(selectedIndex: Binding<Int>) {
             self.selectedIndex = selectedIndex
+        }
+        
+        func getCurrentSelectedIndex() -> Int {
+            return selectedIndex.wrappedValue
         }
         
         func updateData(
