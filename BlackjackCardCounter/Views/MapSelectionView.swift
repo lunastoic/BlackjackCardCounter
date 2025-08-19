@@ -2,7 +2,6 @@ import SwiftUI
  // testtt
 struct MapSelectionView: View {
     @State private var selectedIndex: Int = 0
-    @GestureState private var dragOffset: CGFloat = 0
     @ObservedObject private var xpManager = XPChipManager.shared
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // 1 is always unlocked
     
@@ -45,75 +44,25 @@ struct MapSelectionView: View {
 
                 Spacer().frame(height: 20)
 
-                // ===== Original custom carousel (GeometryReader + HStack + drag) =====
-                GeometryReader { geometry in
-                    let cardWidth: CGFloat = 300
-                    let cardHeight: CGFloat = 420
-                    let spacing: CGFloat = 36
-                    let totalWidth = CGFloat(maps.count) * (cardWidth + spacing)
-                    let baseOffset = (geometry.size.width - cardWidth) / 2
-                    let indexOffset = CGFloat(selectedIndex) * (cardWidth + spacing)
-                    let calculatedOffset = baseOffset - indexOffset + dragOffset
-
-                    HStack(alignment: .center, spacing: spacing) {
-                        ForEach(maps.indices, id: \.self) { i in
-                            let map = maps[i]
-                            let isSelected = i == selectedIndex
-
-                            MapCard(
-                                map: map,
-                                isSelected: isSelected,
-                                unlockedMaps: unlockedMaps,
-                                xpManager: xpManager,
-                                onTap: { selectedIndex = i },
-                                unlockAction: {
-                                    if xpManager.userLevel >= map.requiredLevel {
-                                    unlockMap(map)
-                                }
+                // ===== Polished MapCarouselView =====
+                if #available(iOS 16.0, *) {
+                    MapCarouselView(
+                        maps: maps,
+                        selectedIndex: $selectedIndex,
+                        onUnlock: { map in
+                            if xpManager.userLevel >= map.requiredLevel {
+                                unlockMap(map)
                             }
-                            )
-                            .frame(width: cardWidth, height: cardHeight)
-                            .opacity(isSelected ? 1.0 : 0.6)
-                            .scaleEffect(isSelected ? 1.0 : 0.95)
-                            .animation(.easeInOut(duration: 0.3), value: selectedIndex)
-                            .id("\(map.id)-\(unlockedMaps)") // force refresh on unlock
                         }
-                    }
-                    .frame(width: totalWidth, alignment: .leading)
-                    .offset(x: calculatedOffset)
-                    // Improved drag gesture with better snapping logic
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 10)
-                            .updating($dragOffset) { value, state, _ in
-                                state = value.translation.width
-                            }
-                            .onEnded { value in
-                                let cardWidthWithSpacing = cardWidth + spacing
-                                let dragDistance = value.translation.width
-                                
-                                // Simplified snapping logic - just use distance threshold
-                                let threshold = cardWidthWithSpacing * 0.25 // 25% of card width
-                                var newIndex = selectedIndex
-                                
-                                if abs(dragDistance) > threshold {
-                                    if dragDistance < 0 && selectedIndex < maps.count - 1 {
-                                        // Swiping left (next card)
-                                        newIndex = selectedIndex + 1
-                                    } else if dragDistance > 0 && selectedIndex > 0 {
-                                        // Swiping right (previous card)
-                                        newIndex = selectedIndex - 1
-                                    }
-                                }
-                                
-                                // Use clean animation without conflicts
-                                withAnimation(.easeInOut(duration: 0.4)) {
-                                    selectedIndex = newIndex
-                                }
-                            }
                     )
+                    .frame(height: 480)
+                } else {
+                    // Fallback for older iOS versions
+                    Text("iOS 16+ Required")
+                        .foregroundColor(.white)
+                        .frame(height: 480)
                 }
-                .frame(height: 440)
-                // ====================================================================
+                // =============================================
 
                 // Progress indicator
                 HStack(spacing: 8) {
