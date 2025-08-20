@@ -106,11 +106,14 @@ struct MapCard: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .clipped()
+                    .opacity(isUnlocking ? 0 : 1) // Fade out background image during unlock
+                    .animation(.easeInOut(duration: 0.5), value: isUnlocking)
 
                 RoundedRectangle(cornerRadius: 32)
                     .fill(Color.black.opacity(isUnlocking ? 0 : 0.5))
                     .allowsHitTesting(false) // overlay is visual only; don't block taps
                     .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                    .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: 0) // White exterior glow for locked cards
 
                 VStack(spacing: 10) {
                     Spacer()
@@ -125,9 +128,10 @@ struct MapCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 162, height: 162)
-                        .opacity(isUnlocking ? 0 : 1)
-                        .scaleEffect(isUnlocking ? 2 : 1)
-                        .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                            .opacity(isUnlocking ? 0 : 1)
+                            .scaleEffect(isUnlocking ? 2 : 1)
+                            .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                            .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0) // Brighter white glow behind the lock asset
                     }
                     .frame(width: 162, height: 162)
                     .background(Color.blue.opacity(0.0)) // Invisible debug indicator
@@ -140,17 +144,21 @@ struct MapCard: View {
                         // Show the "unlock" asset briefly, then reveal buttons
                         showUnlockIcon = true
 
-                        // Wait 0.8s, then persist unlock and reveal
+                        // Wait 0.8s, then start fade transition
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                unlockAction()      // persist to AppStorage
-                                localUnlocked = true
+                            // Prepare unlocked state immediately (like removing a blanket)
+                            unlockAction()      // persist to AppStorage
+                            localUnlocked = true
+                            
+                            // Start fade out animation to reveal the unlocked card underneath
+                            withAnimation(.easeInOut(duration: 1.0)) {
                                 showUnlockIcon = false
-                                // short fade to reveal unlocked card content
                                 isUnlocking = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                    isUnlocking = false
-                                }
+                            }
+                            
+                            // After fade completes, the unlocked card is already visible
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                isUnlocking = false  // Complete the transition
                             }
                         }
                     }
@@ -175,6 +183,8 @@ struct MapCard: View {
                 // Unlocked: themed rounded card + name + image box + per-map buttons
                 RoundedRectangle(cornerRadius: 32)
                     .fill(getMapColor(for: map))
+                    .opacity(isUnlocking ? 0 : 1) // Hide during fade, show after
+                    .animation(.easeInOut(duration: 0.3), value: isUnlocking)
 
                 VStack(spacing: 0) {
                     // Top: name + image with a 2× thicker black border around the image
