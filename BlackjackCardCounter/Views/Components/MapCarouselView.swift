@@ -11,23 +11,38 @@ struct MapCarouselView: View {
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1"
     
     var body: some View {
-        if #available(iOS 17.0, *) {
-            iOS17CarouselView(
-                maps: maps,
-                selectedIndex: $selectedIndex,
-                unlockedMaps: unlockedMaps,
-                xpManager: xpManager,
-                onUnlock: onUnlock
-            )
-        } else {
-            iOS16CarouselView(
-                maps: maps,
-                selectedIndex: $selectedIndex,
-                unlockedMaps: unlockedMaps,
-                xpManager: xpManager,
-                onUnlock: onUnlock
-            )
-            .frame(height: 480) // 420 (card height) + 60 (padding)
+        VStack(spacing: 0) {
+            if #available(iOS 17.0, *) {
+                iOS17CarouselView(
+                    maps: maps,
+                    selectedIndex: $selectedIndex,
+                    unlockedMaps: unlockedMaps,
+                    xpManager: xpManager,
+                    onUnlock: onUnlock
+                )
+            } else {
+                iOS16CarouselView(
+                    maps: maps,
+                    selectedIndex: $selectedIndex,
+                    unlockedMaps: unlockedMaps,
+                    xpManager: xpManager,
+                    onUnlock: onUnlock
+                )
+                .frame(height: 480) // 420 (card height) + 60 (padding)
+            }
+            
+            // Progress bars follow selectedIndex instantly
+            HStack(spacing: 8) {
+                ForEach(0..<maps.count, id: \.self) { index in
+                    Rectangle()
+                        .fill(index == selectedIndex ? Color.white : Color.gray.opacity(0.3))
+                        .frame(width: 20, height: 3)
+                        .cornerRadius(1.5)
+                        .animation(.easeInOut(duration: 0.12), value: selectedIndex)
+                }
+            }
+            .padding(.top, 20)
+            .padding(.bottom, 20)
         }
     }
 }
@@ -46,35 +61,57 @@ private struct iOS17CarouselView: View {
     private let cardSpacing: CGFloat = 24
     
     var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: cardSpacing) {
-                ForEach(maps.indices, id: \.self) { index in
-                    let map = maps[index]
-                    let isSelected = index == selectedIndex
-                    
-                    MapCard(
-                        map: map,
-                        isSelected: isSelected,
-                        unlockedMaps: unlockedMaps,
-                        xpManager: xpManager,
-                        onTap: { 
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedIndex = index
+        GeometryReader { geometry in
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: cardSpacing) {
+                    ForEach(maps.indices, id: \.self) { index in
+                        let map = maps[index]
+                        let isSelected = index == selectedIndex
+                        
+                        MapCard(
+                            map: map,
+                            isSelected: isSelected,
+                            unlockedMaps: unlockedMaps,
+                            xpManager: xpManager,
+                            onTap: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    selectedIndex = index
+                                }
+                            },
+                            unlockAction: { onUnlock(map) }
+                        )
+                        .frame(width: cardWidth, height: cardHeight)
+                        .scaleEffect(isSelected ? 1.0 : 0.92)
+                        .opacity(isSelected ? 1.0 : 0.75)
+                        .animation(.easeInOut(duration: 0.3), value: selectedIndex)
+                        .background(
+                            GeometryReader { cardGeometry in
+                                Color.clear
+                                    .onChange(of: cardGeometry.frame(in: .named("scroll")).minX) { _, newX in
+                                        // Calculate which card is closest to center
+                                        let cardCenter = newX + cardWidth / 2
+                                        let screenCenter = geometry.size.width / 2
+                                        let distance = abs(cardCenter - screenCenter)
+                                        
+                                        // If this card is closest to center, update selectedIndex
+                                        if distance < cardWidth / 2 && index != selectedIndex {
+                                            DispatchQueue.main.async {
+                                                selectedIndex = index
+                                            }
+                                        }
+                                    }
                             }
-                        },
-                        unlockAction: { onUnlock(map) }
-                    )
-                    .frame(width: cardWidth, height: cardHeight)
-                    .scaleEffect(isSelected ? 1.0 : 0.92)
-                    .opacity(isSelected ? 1.0 : 0.75)
-                    .animation(.easeInOut(duration: 0.3), value: selectedIndex)
+                        )
+                    }
                 }
+                .padding(.horizontal, 50) // Add side padding for peek effect
+                .padding(.vertical, 30) // Add more vertical padding to prevent clipping
             }
-            .padding(.horizontal, 50) // Add side padding for peek effect
-            .padding(.vertical, 30) // Add more vertical padding to prevent clipping
+            .coordinateSpace(name: "scroll")
+            .frame(height: cardHeight + 60) // Set explicit height for the scroll view
+            .scrollIndicators(.hidden)
+            .clipped() // Prevent content from overflowing
         }
-        .frame(height: cardHeight + 60) // Set explicit height for the scroll view
-        .scrollIndicators(.hidden)
     }
 }
 
@@ -93,9 +130,15 @@ private struct iOS16CarouselView: UIViewRepresentable {
         
         collectionView.backgroundColor = .clear
         collectionView.showsHorizontalScrollIndicator = false
+        collectionView.showsVerticalScrollIndicator = false
         collectionView.decelerationRate = .fast
         collectionView.delegate = context.coordinator
         collectionView.dataSource = context.coordinator
+        
+        // Prevent vertical scrolling
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.alwaysBounceVertical = false
+        collectionView.alwaysBounceHorizontal = true
         
         // Register cell
         collectionView.register(MapCardCell.self, forCellWithReuseIdentifier: "MapCard")
@@ -104,8 +147,6 @@ private struct iOS16CarouselView: UIViewRepresentable {
     }
     
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
-        let previousSelectedIndex = context.coordinator.getCurrentSelectedIndex()
-        
         context.coordinator.updateData(
             maps: maps,
             selectedIndex: selectedIndex,
@@ -114,14 +155,11 @@ private struct iOS16CarouselView: UIViewRepresentable {
             onUnlock: onUnlock
         )
         
-        // Only scroll if the selected index actually changed (not just due to unlock state change)
-        if previousSelectedIndex != selectedIndex {
-            DispatchQueue.main.async {
-                let indexPath = IndexPath(item: selectedIndex, section: 0)
-                if collectionView.numberOfItems(inSection: 0) > selectedIndex {
-                    collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
-                }
-            }
+        collectionView.reloadData()
+        
+        // Start continuous scroll position monitoring
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            context.coordinator.startTargetTimer(collectionView: collectionView)
         }
     }
     
@@ -176,13 +214,11 @@ private struct iOS16CarouselView: UIViewRepresentable {
         private var unlockedMaps: String = ""
         private var xpManager: XPChipManager?
         private var onUnlock: ((Map) -> Void)?
+        private var targetTimer: Timer?
+        private var isUserScrolling = false
         
         init(selectedIndex: Binding<Int>) {
             self.selectedIndex = selectedIndex
-        }
-        
-        func getCurrentSelectedIndex() -> Int {
-            return selectedIndex.wrappedValue
         }
         
         func updateData(
@@ -221,32 +257,105 @@ private struct iOS16CarouselView: UIViewRepresentable {
                 }
             )
             
+            // Add target tracking for real-time indicator updates
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.checkCardVisibility(collectionView: collectionView, indexPath: indexPath)
+            }
+            
             return cell
         }
         
-        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            isUserScrolling = true
+            
+            // Update immediately during scroll for real-time tracking
             updateSelectedIndex(from: scrollView)
+            
+            // Force immediate update based on scroll position
+            let scrollOffset = scrollView.contentOffset.x
+            let cardWidth = 300.0
+            let spacing = 24.0
+            let totalCardWidth = cardWidth + spacing
+            let estimatedIndex = Int(round(scrollOffset / totalCardWidth))
+            
+            if estimatedIndex >= 0 && estimatedIndex < maps.count && estimatedIndex != selectedIndex.wrappedValue {
+                selectedIndex.wrappedValue = estimatedIndex
+            }
+        }
+        
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            isUserScrolling = true
+            updateSelectedIndex(from: scrollView)
+        }
+        
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            isUserScrolling = false
+            updateSelectedIndex(from: scrollView)
+            stopTargetTimer()
         }
         
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             if !decelerate {
+                isUserScrolling = false
                 updateSelectedIndex(from: scrollView)
+                stopTargetTimer()
             }
         }
         
         private func updateSelectedIndex(from scrollView: UIScrollView) {
             guard let collectionView = scrollView as? UICollectionView else { return }
             
-            let centerPoint = CGPoint(
-                x: scrollView.contentOffset.x + scrollView.frame.width / 2,
-                y: scrollView.frame.height / 2
-            )
+            // Check all visible cells to find which one is most centered
+            var bestIndex: Int?
+            var bestDistance: CGFloat = .greatestFiniteMagnitude
+            let screenCenter = collectionView.frame.width / 2
             
-            if let indexPath = collectionView.indexPathForItem(at: centerPoint) {
-                DispatchQueue.main.async {
-                    self.selectedIndex.wrappedValue = indexPath.item
+            for cell in collectionView.visibleCells {
+                guard let indexPath = collectionView.indexPath(for: cell) else { continue }
+                let cellFrame = cell.convert(cell.bounds, to: collectionView)
+                let cellCenter = cellFrame.midX
+                let distance = abs(cellCenter - screenCenter)
+                
+                if distance < bestDistance {
+                    bestDistance = distance
+                    bestIndex = indexPath.item
                 }
             }
+            
+            if let newIndex = bestIndex, newIndex != self.selectedIndex.wrappedValue {
+                self.selectedIndex.wrappedValue = newIndex
+            }
+        }
+        
+        private func checkCardVisibility(collectionView: UICollectionView, indexPath: IndexPath) {
+            guard let cell = collectionView.cellForItem(at: indexPath) else { return }
+            
+            let cellFrame = cell.convert(cell.bounds, to: collectionView)
+            let screenCenter = collectionView.frame.width / 2
+            let cellCenter = cellFrame.midX
+            let distance = abs(cellCenter - screenCenter)
+            
+            // If this card is closest to center, update selectedIndex
+            if distance < 150 && indexPath.item != self.selectedIndex.wrappedValue {
+                self.selectedIndex.wrappedValue = indexPath.item
+            }
+        }
+        
+        func startTargetTimer(collectionView: UICollectionView?) {
+            targetTimer?.invalidate()
+            targetTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self = self, let collectionView = collectionView else { return }
+                
+                // Only update if user is not actively scrolling
+                if !self.isUserScrolling {
+                    self.updateSelectedIndex(from: collectionView)
+                }
+            }
+        }
+        
+        private func stopTargetTimer() {
+            targetTimer?.invalidate()
+            targetTimer = nil
         }
     }
 }

@@ -54,25 +54,14 @@ struct MapSelectionView: View {
                             }
                         }
                     )
-                    .frame(height: 480)
+                    .frame(height: 520) // Increased height to accommodate the progress indicator
                 } else {
                     // Fallback for older iOS versions
                     Text("iOS 16+ Required")
                         .foregroundColor(.white)
-                        .frame(height: 480)
+                        .frame(height: 520)
                 }
                 // =============================================
-
-                // Progress indicator
-                HStack(spacing: 8) {
-                    ForEach(0..<maps.count, id: \.self) { index in
-                        Rectangle()
-                            .fill(index == selectedIndex ? Color.white : Color.gray.opacity(0.3))
-                            .frame(width: 20, height: 3)
-                            .cornerRadius(1.5)
-                    }
-                }
-                .padding(.bottom, 20)
 
                 Spacer()
             }
