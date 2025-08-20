@@ -19,8 +19,14 @@ struct BlackjackBettingView: View {
                         let count = gameState.betChips.filter { $0 == value }.count
                         ZStack {
                             ForEach(0..<count, id: \.self) { index in
+                                let angle = Double(index) * 1.2
+                                let radius: CGFloat = 4.0 // Smaller radius for tighter spiral
+                                let xOffset = radius * cos(angle)
+                                let yOffset = radius * sin(angle)
+                                
                                 ChipView(chip: Chip(value: value))
-                                    .offset(x: CGFloat(index) * 2, y: CGFloat(index) * 2)
+                                    .offset(x: xOffset, y: yOffset)
+                                    .zIndex(Double(index))
                             }
                         }
                     }
