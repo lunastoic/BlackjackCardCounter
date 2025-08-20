@@ -1,50 +1,81 @@
+//
+//  ContentView.swift
+//  BlackjackCardCounter
+//
+//  Created by Christopher on 5/29/25.
+//
+
 import SwiftUI
 
 struct ContentView: View {
+    @AppStorage("userChips") private var userChips: Int = 500
+    @State private var showZeroChipsOverlay = false
+    
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background gradient
-                LinearGradient(gradient: Gradient(colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")]),
-                               startPoint: .top, endPoint: .bottom)
+                LinearGradient(gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
+                             startPoint: .top,
+                             endPoint: .bottom)
                     .ignoresSafeArea()
+                
                 VStack(spacing: 30) {
+                    // Game Header
+                    GameHeaderView()
+                    
                     // Title
                     Text("Blackjack Card Counter")
-                        .font(.fixedSystem(size: 40, weight: .bold))
+                        .font(.system(size: 32, weight: .bold))
                         .foregroundColor(.white)
-                    // Home screen image
-                    Image("HouseDealer")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(radius: 8)
+                    
+                    // Home screen image with rewards button overlay
+                    ZStack(alignment: .topTrailing) {
+                        Image("HouseDealer")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 360)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .shadow(radius: 8)
+                        
+                        NavigationLink(destination: RewardsView()) {
+                            RewardsButton()
+                        }
+                        .padding(.top, 20)
+                        .padding(.trailing, 20)
+                    }
+                    
                     // Main menu buttons
                     VStack(spacing: 20) {
                         NavigationLink(destination: MapSelectionView()) {
                             MenuButton(title: "Start Counting", systemImage: "play.fill")
                         }
+                        .onTapGesture {
+                            if userChips <= 0 {
+                                showZeroChipsOverlay = true
+                            }
+                        }
+                        
                         NavigationLink(destination: SettingsView()) {
                             MenuButton(title: "Settings", systemImage: "gear")
                         }
+                        
                         NavigationLink(destination: HowToPlayView()) {
                             MenuButton(title: "How to Play", systemImage: "book.fill")
                         }
                     }
                 }
                 .padding()
+                .frame(maxWidth: 600) // Limit width on larger screens
+                .frame(maxWidth: .infinity) // Center the content
             }
-            .overlay(
-                GeometryReader { geo in
-                    NavigationLink(destination: RewardsView()) {
-                        RewardsButton()
-                    }
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .overlay {
+                if showZeroChipsOverlay {
+                    ZeroChipsOverlay(isPresented: $showZeroChipsOverlay)
                 }
-            )
+            }
         }
-        .disableDynamicType()
+        .navigationViewStyle(StackNavigationViewStyle()) // Force full screen on iPad
     }
 }
 
@@ -52,19 +83,21 @@ struct ContentView: View {
 struct MenuButton: View {
     let title: String
     let systemImage: String
+    
     var body: some View {
         HStack {
             Image(systemName: systemImage)
-                .font(.fixedSystem(size: 20, weight: .semibold))
+                .font(.title2)
             Text(title)
-                .font(.fixedSystem(size: 20, weight: .semibold))
+                .font(.title2)
+                .fontWeight(.semibold)
         }
         .foregroundColor(.white)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: 280)
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(Color(hex: "0f3460"))
+                .fill(Color(hex: "38b802"))
                 .shadow(radius: 5)
         )
     }
@@ -113,9 +146,29 @@ struct RewardsButton: View {
             .padding(.horizontal, 60)
             .background(rewardAvailable ? Color.yellow : Color.gray)
             .cornerRadius(18)
-            .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12)
+            .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12, x: 0, y: 4)
             .scaleEffect(animate && rewardAvailable ? 1.08 : 1.0)
-            .animation(rewardAvailable ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true) : .default, value: animate)
-            .onAppear { animate = true }
+            .onAppear {
+                guard rewardAvailable else { return }
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    animate = true
+                }
+            }
+            .onChange(of: rewardAvailable) { isAvailable in
+                if isAvailable {
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        animate = true
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animate = false
+                    }
+                }
+            }
+
     }
+}
+
+#Preview {
+    ContentView()
 } 

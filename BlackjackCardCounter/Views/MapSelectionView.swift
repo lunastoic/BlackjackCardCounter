@@ -185,6 +185,7 @@ struct MapCard: View {
                             .multilineTextAlignment(.center)
                             .padding(.top, 30)
                             .padding(.horizontal, 8)
+                            .offset(y: 3)
 
                         ZStack {
                             RoundedRectangle(cornerRadius: 20)

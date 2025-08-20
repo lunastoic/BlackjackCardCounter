@@ -26,7 +26,7 @@ struct ContentView: View {
                     
                     // Title
                     Text("Blackjack Card Counter")
-                        .font(.fixedSystem(size: 35, weight: .bold))
+                        .font(.system(size: 32, weight: .bold))
                         .foregroundColor(.white)
                     
                     // Home screen image with rewards button overlay
@@ -76,7 +76,6 @@ struct ContentView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle()) // Force full screen on iPad
-        .disableDynamicType()
     }
 }
 
@@ -88,9 +87,10 @@ struct MenuButton: View {
     var body: some View {
         HStack {
             Image(systemName: systemImage)
-                .font(.fixedSystem(size: 20, weight: .semibold))
+                .font(.title2)
             Text(title)
-                .font(.fixedSystem(size: 20, weight: .semibold))
+                .font(.title2)
+                .fontWeight(.semibold)
         }
         .foregroundColor(.white)
         .frame(maxWidth: 280)
@@ -139,7 +139,8 @@ struct RewardsButton: View {
     }
     var body: some View {
         Text("🎁 Rewards")
-            .font(.fixedSystem(size: 18, weight: .bold))
+            .font(.title2)
+            .fontWeight(.bold)
             .foregroundColor(.white)
             .padding(.vertical, 14)
             .padding(.horizontal, 60)
@@ -147,13 +148,22 @@ struct RewardsButton: View {
             .cornerRadius(18)
             .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12, x: 0, y: 4)
             .scaleEffect(animate && rewardAvailable ? 1.08 : 1.0)
-            .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: animate && rewardAvailable)
             .onAppear {
                 guard rewardAvailable else { return }
-                animate = true
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    animate = true
+                }
             }
             .onChange(of: rewardAvailable) { isAvailable in
-                animate = isAvailable
+                if isAvailable {
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        animate = true
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animate = false
+                    }
+                }
             }
     }
 }
