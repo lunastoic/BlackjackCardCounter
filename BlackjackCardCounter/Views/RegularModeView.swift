@@ -97,7 +97,6 @@ struct RegularModeView: View {
                                 .aspectRatio(0.7, contentMode: .fit)
                                 .frame(width: 48, height: 72)
                                 .shadow(radius: 4)
-                                .matchedGeometryEffect(id: "deckPile", in: cardAnimation)
                             Text("Deck")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
@@ -355,13 +354,18 @@ struct RegularModeView: View {
                             .resizable()
                             .aspectRatio(0.7, contentMode: .fit)
                                 .frame(width: cardSize.width, height: cardSize.height)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                             .shadow(radius: 3)
-                                .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 0 : 1)
+                                .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
                                 .rotation3DEffect(
                                     .degrees(gameState.cardFlipRotations[cardId] ?? 0),
                                     axis: (x: 0, y: 1, z: 0), perspective: 0.6
                                 )
+                                .allowsHitTesting(false)
+                                .zIndex(-1)
                         }
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .allowsHitTesting(false)
 
                         Group {
                             if isCollectingPhase { core.position(pos) }

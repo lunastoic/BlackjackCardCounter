@@ -30,7 +30,7 @@ struct GameHeaderView: View {
             .background(Color.black.opacity(0.3))
             .cornerRadius(20)
             .scaleEffect(isAnimatingChips ? 1.1 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isAnimatingChips)
+            .animation(nil, value: isAnimatingChips)
             
             Spacer()
             
@@ -64,7 +64,7 @@ struct GameHeaderView: View {
                                 )
                             )
                             .frame(width: geometry.size.width * progress, height: 8)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: progress)
+                            .animation(.easeInOut(duration: 0.5), value: progress)
                     }
                 }
                 .frame(width: 100, height: 8)
@@ -78,10 +78,8 @@ struct GameHeaderView: View {
         .padding(.top, 8)
         .disableDynamicType()
         .onReceive(NotificationCenter.default.publisher(for: .xpChipDidChange)) { _ in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                isAnimatingXP = true
-                isAnimatingChips = true
-            }
+            isAnimatingXP = true
+            isAnimatingChips = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isAnimatingXP = false
                 isAnimatingChips = false

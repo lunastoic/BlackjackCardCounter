@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @AppStorage("userChips") private var userChips: Int = 500
     @State private var showZeroChipsOverlay = false
+    @State private var hasBeenClicked = false
     
     var body: some View {
         NavigationStack {
@@ -30,7 +31,7 @@ struct ContentView: View {
                         .foregroundColor(.white)
                     
                     // Home screen image with rewards button overlay
-                    ZStack(alignment: .topTrailing) {
+                    ZStack {
                         Image("HouseDealer")
                             .resizable()
                             .scaledToFit()
@@ -38,12 +39,23 @@ struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 20))
                             .shadow(radius: 8)
                         
-                        NavigationLink(destination: RewardsView()) {
-                            RewardsButton()
+                        VStack {
+                            HStack {
+                                Spacer()
+                                ZStack {
+                                    NavigationLink(destination: RewardsView()) {
+                                        RewardsButton(hasBeenClicked: $hasBeenClicked)
+                                    }
+                                }
+                                .padding(.trailing, 30)
+                            }
+                            .padding(.top, 25)
+                            Spacer()
                         }
-                        .padding(.top, 20)
-                        .padding(.trailing, 20)
+                        .allowsHitTesting(true)
+                        .zIndex(10)
                     }
+                    .clipped()
                     
                     // Main menu buttons
                     VStack(spacing: 20) {
@@ -133,38 +145,58 @@ extension Color {
 struct RewardsButton: View {
     @AppStorage("lastDailyRewardDate") var lastDailyRewardDate: Double = 0
     @State private var animate = false
+    @Binding var hasBeenClicked: Bool
     var rewardAvailable: Bool {
         let now = Date().timeIntervalSince1970
         return now - lastDailyRewardDate > 24 * 60 * 60
     }
     var body: some View {
-        Text("🎁 Rewards")
-            .font(.title2)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 60)
-            .background(rewardAvailable ? Color.yellow : Color.gray)
-            .cornerRadius(18)
-            .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12, x: 0, y: 4)
-            .scaleEffect(animate && rewardAvailable ? 1.08 : 1.0)
-            .onAppear {
-                guard rewardAvailable else { return }
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+        ZStack {
+            Text("🎁 Rewards")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 60)
+                .background(rewardAvailable ? Color.yellow : Color.gray)
+                .cornerRadius(18)
+                .shadow(color: rewardAvailable ? .yellow : .clear, radius: 12, x: 0, y: 4)
+        }
+        .scaleEffect(animate && rewardAvailable && !hasBeenClicked ? 1.08 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: animate)
+        .zIndex(1)
+        .onAppear {
+            if rewardAvailable && !hasBeenClicked {
+                startSpringAnimation()
+            }
+        }
+        .onChange(of: rewardAvailable) { isAvailable in
+            if isAvailable && !hasBeenClicked {
+                startSpringAnimation()
+            } else {
+                animate = false
+            }
+        }
+
+    }
+    
+    private func startSpringAnimation() {
+        animate = true
+        Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { timer in
+            if rewardAvailable && !hasBeenClicked {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     animate = true
                 }
-            }
-            .onChange(of: rewardAvailable) { isAvailable in
-                if isAvailable {
-                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                        animate = true
-                    }
-                } else {
-                    withAnimation(.easeOut(duration: 0.3)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         animate = false
                     }
                 }
+            } else {
+                timer.invalidate()
+                animate = false
             }
+        }
     }
 }
 
