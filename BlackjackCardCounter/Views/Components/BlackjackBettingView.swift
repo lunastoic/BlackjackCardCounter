@@ -66,7 +66,7 @@ struct BlackjackBettingView: View {
             // Win/Lose/Push message
             if let result = gameState.resultMessage {
                 if gameState.lastPayout > 0 {
-                    Text("Win $\(gameState.lastPayout * 2)")
+                    Text("Win $\(gameState.lastPayout)")
                         .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(Color(hex: "00FF41"))
                         .multilineTextAlignment(.center)

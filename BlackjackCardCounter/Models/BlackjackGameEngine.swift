@@ -443,7 +443,7 @@ class BlackjackGameEngine: ObservableObject {
             // - Loss (payout < 0): Return nothing (bet is lost)
             let credited: Int
             if payout > 0 {
-                credited = payout + gameState.playerBet  // Win: bet + winnings
+                credited = payout  // Win: payout already includes bet + winnings
             } else if payout == 0 {
                 credited = gameState.playerBet  // Push: return bet only
             } else {
@@ -561,6 +561,34 @@ class BlackjackGameEngine: ObservableObject {
                     if let idx = localDeck.firstIndex(where: { $0.rank.value == first.rank.value }) {
                         card = localDeck.remove(at: idx)
                     } else { card = localDeck.removeFirst() }
+                }
+            } else if UserDefaults.standard.bool(forKey: "forcedBlackjacks") {
+                // Force blackjack for player only (first two cards)
+                if i == 0 || i == 2 {
+                    // Player's cards - force blackjack (indices 0 and 2)
+                    if i == 0 {
+                        // First player card: Ace
+                        if let idx = localDeck.firstIndex(where: { $0.rank == .ace }) {
+                            card = localDeck.remove(at: idx)
+                            print("🎲 Debug: Forced Ace for player blackjack (first card)")
+                        } else {
+                            card = localDeck.removeFirst()
+                            print("🎲 Debug: No Ace available for forced blackjack")
+                        }
+                    } else {
+                        // Second player card: 10-value card
+                        let tenValueRanks: [CardRank] = [.ten, .jack, .queen, .king]
+                        if let idx = localDeck.firstIndex(where: { tenValueRanks.contains($0.rank) }) {
+                            card = localDeck.remove(at: idx)
+                            print("🎲 Debug: Forced 10-value card for player blackjack (second card)")
+                        } else {
+                            card = localDeck.removeFirst()
+                            print("🎲 Debug: No 10-value card available for forced blackjack")
+                        }
+                    }
+                } else {
+                    // Dealer's cards - deal normally
+                    card = localDeck.removeFirst()
                 }
             } else if force10s {
                 // Force 10-value cards (10, J, Q, K) for all dealt cards

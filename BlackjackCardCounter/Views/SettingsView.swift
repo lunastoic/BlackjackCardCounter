@@ -4,6 +4,7 @@ struct SettingsView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
     @AppStorage("dealerSpeed") private var dealerSpeed = 1.0
     @AppStorage("vibrationEnabled") private var vibrationEnabled = true
+    @AppStorage("forcedBlackjacks") private var forcedBlackjacks = false
     
     var body: some View {
         ZStack {
@@ -120,6 +121,21 @@ struct SettingsView: View {
                                     set: { UserDefaults.standard.set($0, forKey: "debugForce10s") }
                                 ))
                                 .labelsHidden()
+                            }
+                            
+                            // Force Blackjacks Toggle for Testing
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Force Blackjacks (Testing)")
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                    Text("Player and dealer always get blackjack")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                                Toggle("", isOn: $forcedBlackjacks)
+                                    .labelsHidden()
                             }
                             
                             Divider()
