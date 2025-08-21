@@ -87,6 +87,7 @@ struct MapCard: View {
     @State private var wasUnlocked = false
     @State private var showUnlockIcon = false
     @State private var localUnlocked = false
+    @State private var isShaking = false
 
     // For crisp hairline borders scaled to device pixels
     @Environment(\.displayScale) private var displayScale
@@ -130,7 +131,9 @@ struct MapCard: View {
                             .frame(width: 162, height: 162)
                             .opacity(isUnlocking ? 0 : 1)
                             .scaleEffect(isUnlocking ? 2 : 1)
+                            .offset(x: isShaking ? 8 : 0)
                             .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                            .animation(.easeInOut(duration: 0.1).repeatCount(3, autoreverses: true), value: isShaking)
                             .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0) // Brighter white glow behind the lock asset
                     }
                     .frame(width: 162, height: 162)
@@ -139,26 +142,33 @@ struct MapCard: View {
                     .onTapGesture {
                         guard !isUnlocking else { return }
                         guard !showUnlockIcon else { return }
-                        guard xpManager.userLevel >= map.requiredLevel else { return }
+                        
+                        if xpManager.userLevel >= map.requiredLevel {
+                            // Show the "unlock" asset briefly, then reveal buttons
+                            showUnlockIcon = true
 
-                        // Show the "unlock" asset briefly, then reveal buttons
-                        showUnlockIcon = true
-
-                        // Wait 0.8s, then start fade transition
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            // Prepare unlocked state immediately (like removing a blanket)
-                            unlockAction()      // persist to AppStorage
-                            localUnlocked = true
-                            
-                            // Start fade out animation to reveal the unlocked card underneath
-                            withAnimation(.easeInOut(duration: 1.0)) {
-                                showUnlockIcon = false
-                                isUnlocking = true
+                            // Wait 0.8s, then start fade transition
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                // Prepare unlocked state immediately (like removing a blanket)
+                                unlockAction()      // persist to AppStorage
+                                localUnlocked = true
+                                
+                                // Start fade out animation to reveal the unlocked card underneath
+                                withAnimation(.easeInOut(duration: 1.0)) {
+                                    showUnlockIcon = false
+                                    isUnlocking = true
+                                }
+                                
+                                // After fade completes, the unlocked card is already visible
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    isUnlocking = false  // Complete the transition
+                                }
                             }
-                            
-                            // After fade completes, the unlocked card is already visible
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                isUnlocking = false  // Complete the transition
+                        } else {
+                            // Shake the lock to indicate insufficient level
+                            isShaking = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                isShaking = false
                             }
                         }
                     }
