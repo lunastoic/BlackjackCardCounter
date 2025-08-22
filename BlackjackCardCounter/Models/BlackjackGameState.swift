@@ -20,6 +20,7 @@ class BlackjackGameState: ObservableObject {
     @Published var lastPayout: Int = 0
     @Published var cardsDealt: Int = 0
     @Published var runningCount: Int = 0
+    @Published var isTrainingMode: Bool = false
     
     // Betting state
     @Published var playerBet: Int = 0

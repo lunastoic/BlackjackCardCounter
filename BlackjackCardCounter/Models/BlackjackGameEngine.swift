@@ -127,6 +127,7 @@ class BlackjackGameEngine: ObservableObject {
             let newCard = gameState.deck.removeFirst()
             gameState.splitHands[gameState.activeHandIndex].append(newCard)
             gameState.runningCount += newCard.countValue
+            gameState.cardsDealt += 1
             
             // Check for bust immediately on split hand
             let splitHandBusted = isBust(gameState.splitHands[gameState.activeHandIndex])
@@ -150,6 +151,7 @@ class BlackjackGameEngine: ObservableObject {
             let newCard = gameState.deck.removeFirst()
             gameState.playerHand.append(newCard)
             gameState.runningCount += newCard.countValue
+            gameState.cardsDealt += 1
 
             // Check for bust immediately to hide action buttons
             let playerBusted = isBust(gameState.playerHand)
@@ -185,11 +187,6 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     func standAction(gameState: BlackjackGameState) {
-        // Immediately disable player actions to prevent rapid tapping
-        gameState.isPlayerTurn = false
-        gameState.isProcessingAction = true
-        print("🎲 Stand executed - player turn ended, buttons disabled immediately")
-        
         if gameState.isSplit { nextSplitHandOrDealer(gameState: gameState) }
         else { dealerTurn(gameState: gameState) }
     }
@@ -366,6 +363,7 @@ class BlackjackGameEngine: ObservableObject {
                 let card = localDeck.removeFirst()
                 dealer.append(card)
                 localRunningCount += card.countValue
+                gameState.cardsDealt += 1
                 
                 if let cb = hitAnimationCallback {
                     cb(card, false) {
@@ -512,7 +510,6 @@ class BlackjackGameEngine: ObservableObject {
         gameState.isSplit = false
         gameState.showNextHand = true
         gameState.isPlayerTurn = true
-        gameState.isProcessingAction = false
         
         dealCardsSequentially(gameState: gameState, useRegularModeAnimation: useRegularModeAnimation, animationCallback: animationCallback)
     }

@@ -55,8 +55,8 @@ struct RegularModeView: View {
     
     var body: some View {
         GeometryReader { tableGeo in
-        ZStack {
-                // Background
+                ZStack {
+            // Background
             LinearGradient(
                 gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
                     startPoint: .top, endPoint: .bottom
@@ -91,15 +91,19 @@ struct RegularModeView: View {
                 VStack(spacing: 0) {
                         // Top row: decorative Deck (left) + functional Shoe (right)
                     HStack {
-                        VStack {
-                            Image("DeckCover")
-                                .resizable()
-                                .aspectRatio(0.7, contentMode: .fit)
-                                .frame(width: 48, height: 72)
-                                .shadow(radius: 4)
-                            Text("Deck")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                        ZStack {
+                            VStack {
+                                Image("DeckCover")
+                                    .resizable()
+                                    .aspectRatio(0.7, contentMode: .fit)
+                                    .frame(width: 48, height: 72)
+                                    .shadow(radius: 4)
+                                Text("Deck")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            
+                            CardCounterView(gameState: gameState)
                         }
                         
                         Spacer()
@@ -300,9 +304,8 @@ struct RegularModeView: View {
 
                                                 if gameState.isPlayerTurn && gameState.playerHand.count >= 2 {
                             // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                            let activeHasBlackjack = gameState.isSplit ? 
-                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex]) :
-                                gameEngine.isBlackjack(gameState.playerHand)
+                            let activeHasBlackjack = gameState.isSplit && 
+                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
                             
                             let playerBusted = gameState.isSplit ? 
                                 gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
@@ -431,11 +434,12 @@ struct RegularModeView: View {
             }
         }
                     }
-                }
-            }
-        .coordinateSpace(name: "table")
+                            }
+        }
+                .coordinateSpace(name: "table")
         .onAppear {
-                tableSize = tableGeo.size
+            gameState.isTrainingMode = false
+            tableSize = tableGeo.size
                 _ = UIImage(named: "DeckCover")
                 ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) }
             gameEngine.resetDeck(gameState: gameState)

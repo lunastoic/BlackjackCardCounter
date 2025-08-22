@@ -88,6 +88,11 @@ struct TrainingModeView: View {
                     }
                 }
                 
+                // Card Counter
+                ZStack {
+                    CardCounterView(gameState: gameState, xOffset: -154)
+                }
+                
                 // Visualizers at the top
                 VStack(spacing: 8) {
                     CardCountMeter(runningCount: gameState.runningCount)
@@ -241,9 +246,8 @@ struct TrainingModeView: View {
                         
                         if gameState.showNextHand && gameState.isPlayerTurn && !trainingModeEnabled {
                             // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                            let activeHasBlackjack = gameState.isSplit ? 
-                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex]) :
-                                gameEngine.isBlackjack(gameState.playerHand)
+                            let activeHasBlackjack = gameState.isSplit && 
+                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
                             
                             let playerBusted = gameState.isSplit ? 
                                 gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
@@ -535,6 +539,9 @@ struct TrainingModeView: View {
         .frame(maxWidth: 1000) // Limit width on larger screens
         .frame(maxWidth: .infinity) // Center the content
         .disableDynamicType()
+        .onAppear {
+            gameState.isTrainingMode = true
+        }
     }
     
     // State to prevent multiple auto-play actions
