@@ -241,8 +241,9 @@ struct TrainingModeView: View {
                         
                         if gameState.showNextHand && gameState.isPlayerTurn && !trainingModeEnabled {
                             // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                            let activeHasBlackjack = gameState.isSplit && 
-                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                            let activeHasBlackjack = gameState.isSplit ? 
+                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex]) :
+                                gameEngine.isBlackjack(gameState.playerHand)
                             
                             let playerBusted = gameState.isSplit ? 
                                 gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :

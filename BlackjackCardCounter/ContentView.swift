@@ -109,7 +109,7 @@ struct MenuButton: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(Color(hex: "38b802"))
+                .fill(Color(hex: "00A300"))
                 .shadow(radius: 5)
         )
     }

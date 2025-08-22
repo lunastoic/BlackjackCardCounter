@@ -185,6 +185,11 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     func standAction(gameState: BlackjackGameState) {
+        // Immediately disable player actions to prevent rapid tapping
+        gameState.isPlayerTurn = false
+        gameState.isProcessingAction = true
+        print("🎲 Stand executed - player turn ended, buttons disabled immediately")
+        
         if gameState.isSplit { nextSplitHandOrDealer(gameState: gameState) }
         else { dealerTurn(gameState: gameState) }
     }
@@ -507,6 +512,7 @@ class BlackjackGameEngine: ObservableObject {
         gameState.isSplit = false
         gameState.showNextHand = true
         gameState.isPlayerTurn = true
+        gameState.isProcessingAction = false
         
         dealCardsSequentially(gameState: gameState, useRegularModeAnimation: useRegularModeAnimation, animationCallback: animationCallback)
     }
