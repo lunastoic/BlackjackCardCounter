@@ -21,13 +21,12 @@ struct TrainingModeView: View {
     
     var body: some View {
         ZStack {
-            // Background gradient - ensure it covers the entire screen
-            LinearGradient(
-                gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(.all, edges: .all)
+            // Background image - ensure it covers the entire screen
+            Image("GreenSuede")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                .ignoresSafeArea(.all, edges: .all)
             
             // Background text - arched like a rainbow (behind everything)
             GeometryReader { geo in
@@ -70,6 +69,7 @@ struct TrainingModeView: View {
                 // Game Header
                 ZStack(alignment: .topTrailing) {
                     GameHeaderView()
+                        .padding(.top, 50)
                     
                     if gameState.showDebugPayout, let msg = gameState.debugPayoutMessage {
                         Text(msg)
@@ -90,7 +90,11 @@ struct TrainingModeView: View {
                 
                                  // Card Counter
                  ZStack {
-                     CardCounterView(gameState: gameState, xOffset: -154, yOffset: 443)
+                     CardCounterView(
+                         gameState: gameState,
+                         xOffset: UIDevice.current.userInterfaceIdiom == .pad ? -330 : -154,
+                         yOffset: UIDevice.current.userInterfaceIdiom == .pad ? 510 : 443
+                     )
                  }
                 
                 // Visualizers at the top
@@ -163,7 +167,7 @@ struct TrainingModeView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                 Text(dealerValueLabel())
-                                    .font(.subheadline)
+                                    .font(.system(size: 17, weight: .bold))
                                     .foregroundColor(.yellow)
                             }
                             
@@ -194,7 +198,7 @@ struct TrainingModeView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                 Text(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand))
-                                    .font(.subheadline)
+                                    .font(.system(size: 17, weight: .bold))
                                     .foregroundColor(.yellow)
                             }
                             

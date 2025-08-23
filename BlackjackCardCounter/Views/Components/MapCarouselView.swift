@@ -78,22 +78,30 @@ private struct iOS17CarouselView: UIViewRepresentable {
         return collectionView
     }
     
-    func updateUIView(_ collectionView: UICollectionView, context: Context) {
-        context.coordinator.updateData(
-            maps: maps,
-            selectedIndex: selectedIndex,
-            unlockedMaps: unlockedMaps,
-            xpManager: xpManager,
-            onUnlock: onUnlock
-        )
-        
-        collectionView.reloadData()
-        
-        // Start continuous scroll position monitoring
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            context.coordinator.startTargetTimer(collectionView: collectionView)
+            func updateUIView(_ collectionView: UICollectionView, context: Context) {
+            context.coordinator.updateData(
+                maps: maps,
+                selectedIndex: selectedIndex,
+                unlockedMaps: unlockedMaps,
+                xpManager: xpManager,
+                onUnlock: onUnlock
+            )
+            
+            collectionView.reloadData()
+            
+            // Force iPad to start at index 0
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    let indexPath = IndexPath(item: 0, section: 0)
+                    collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
+                }
+            }
+            
+            // Start continuous scroll position monitoring
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                context.coordinator.startTargetTimer(collectionView: collectionView)
+            }
         }
-    }
     
     func makeCoordinator() -> Coordinator {
         Coordinator(selectedIndex: $selectedIndex)
@@ -333,6 +341,14 @@ private struct iOS16CarouselView: UIViewRepresentable {
         )
         
         collectionView.reloadData()
+        
+        // Force iPad to start at index 0
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                let indexPath = IndexPath(item: 0, section: 0)
+                collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
+            }
+        }
         
         // Start continuous scroll position monitoring
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

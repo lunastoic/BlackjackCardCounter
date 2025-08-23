@@ -57,10 +57,10 @@ struct RegularModeView: View {
         GeometryReader { tableGeo in
         ZStack {
             // Background
-            LinearGradient(
-                gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
-                    startPoint: .top, endPoint: .bottom
-            )
+            Image("GreenSuede")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
                 .ignoresSafeArea()
             
                 // Decorative arch text
@@ -69,17 +69,17 @@ struct RegularModeView: View {
                     createArchedText(
                             text: "Luna Luxe Casino", fontSize: 36,
                             width: geo.size.width * 0.8, height: 80,
-                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 125
+                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 175
                     )
                     createArchedText(
                             text: "Blackjack pays 3 to 2", fontSize: 24,
                             width: geo.size.width * 0.7, height: 60,
-                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 95
+                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 145
                     )
                     createArchedText(
                             text: "Dealer must hit on soft 17", fontSize: 16,
                             width: geo.size.width * 0.75, height: 50,
-                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 65
+                            centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 115
                     )
                     }.allowsHitTesting(false)
             }
@@ -145,7 +145,7 @@ struct RegularModeView: View {
                         // Dealer
                     VStack(spacing: 8) {
                             Text("Dealer").font(.headline).foregroundColor(.white)
-                            Text(dealerValueLabel()).font(.subheadline).foregroundColor(.yellow)
+                            Text(dealerValueLabel()).font(.system(size: 17, weight: .bold)).foregroundColor(.yellow)
                                 .offset(y: -6)
                         
                             // Hidden placeholders to keep layout stable
@@ -216,7 +216,7 @@ struct RegularModeView: View {
                                     }
                                 }
                             } else {
-                                Text(playerValueLabel()).font(.subheadline).foregroundColor(.yellow)
+                                Text(playerValueLabel()).font(.system(size: 17, weight: .bold)).foregroundColor(.yellow)
                                     .offset(y: -6)
 
                                 // Hidden placeholders for non-split player
@@ -546,8 +546,8 @@ struct RegularModeView: View {
     // MARK: - Layout helpers
     private func yForHand(isPlayer: Bool, size: CGSize) -> CGFloat {
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-        let playerY: CGFloat = isIPad ? size.height * 0.50 : size.height * 0.55
-        let dealerY: CGFloat = isIPad ? size.height * 0.36 : size.height * 0.38
+        let playerY: CGFloat = isIPad ? size.height * 0.40 : size.height * 0.55
+        let dealerY: CGFloat = isIPad ? (size.height * 0.26 + 21) : size.height * 0.38
         return isPlayer ? (playerY + playerYOffset) : (dealerY + dealerYOffset)
     }
 

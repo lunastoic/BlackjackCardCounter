@@ -1,7 +1,7 @@
 import SwiftUI
  // testtt
 struct MapSelectionView: View {
-    @State private var selectedIndex: Int = 0
+    @State private var selectedIndex: Int = UIDevice.current.userInterfaceIdiom == .pad ? 0 : 0
     @ObservedObject private var xpManager = XPChipManager.shared
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // 1 is always unlocked
     
@@ -55,6 +55,22 @@ struct MapSelectionView: View {
                         }
                     )
                     .frame(height: 520) // Increased height to accommodate the progress indicator
+                    .onAppear {
+                        // Ensure iPad starts on Luna Luxe Casino (index 0)
+                        if UIDevice.current.userInterfaceIdiom == .pad {
+                            selectedIndex = 0
+                            // Force it multiple times to override any auto-scroll
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                selectedIndex = 0
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                selectedIndex = 0
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                selectedIndex = 0
+                            }
+                        }
+                    }
                 } else {
                     // Fallback for older iOS versions
                     Text("iOS 16+ Required")
