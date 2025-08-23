@@ -88,10 +88,10 @@ struct TrainingModeView: View {
                     }
                 }
                 
-                // Card Counter
-                ZStack {
-                    CardCounterView(gameState: gameState, xOffset: -154)
-                }
+                                 // Card Counter
+                 ZStack {
+                     CardCounterView(gameState: gameState, xOffset: -154, yOffset: 443)
+                 }
                 
                 // Visualizers at the top
                 VStack(spacing: 8) {
@@ -541,6 +541,10 @@ struct TrainingModeView: View {
         .disableDynamicType()
         .onAppear {
             gameState.isTrainingMode = true
+            // Initialize numberOfDecks if not set
+            if gameState.numberOfDecks == 0 {
+                gameState.numberOfDecks = numberOfDecks
+            }
         }
     }
     
@@ -1154,8 +1158,56 @@ struct SettingsTabView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .frame(width: 220)
-                    .onChange(of: numberOfDecks) { _ in
-                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                    .disabled(gameState.isDealing || 
+                             (gameState.isPlayerTurn && !gameState.playerHand.isEmpty))
+                    .onChange(of: numberOfDecks) { newValue in
+                        // Check if game is finished (result message shown)
+                        let isGameFinished = gameState.resultMessage != nil
+                        
+                        // If game is finished, wait 2 seconds before allowing deck change
+                        if isGameFinished {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                // Double-check that game is still finished after delay
+                                if gameState.resultMessage != nil {
+                                    // Game is still finished, safe to change decks
+                                    gameState.dealtPlayerCards.removeAll()
+                                    gameState.dealtDealerCards.removeAll()
+                                    gameState.playerHand.removeAll()
+                                    gameState.dealerHand.removeAll()
+                                    gameState.visuallyRevealedDealerHand.removeAll()
+                                    gameState.resultMessage = nil
+                                    gameState.showNextHand = false
+                                    
+                                    gameState.numberOfDecks = newValue
+                                    // Store current deck position before reset
+                                    let currentDeckPosition = gameState.deckPosition
+                                    gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
+                                    // Restore the deck position for animation after reset
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        gameState.deckPosition = currentDeckPosition
+                                    }
+                                }
+                            }
+                            return
+                        }
+                        
+                        // Game is not finished, safe to change decks immediately
+                        gameState.dealtPlayerCards.removeAll()
+                        gameState.dealtDealerCards.removeAll()
+                        gameState.playerHand.removeAll()
+                        gameState.dealerHand.removeAll()
+                        gameState.visuallyRevealedDealerHand.removeAll()
+                        gameState.resultMessage = nil
+                        gameState.showNextHand = false
+                        
+                        gameState.numberOfDecks = newValue
+                        // Store current deck position before reset
+                        let currentDeckPosition = gameState.deckPosition
+                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
+                        // Restore the deck position for animation after reset
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            gameState.deckPosition = currentDeckPosition
+                        }
                     }
                 }
                 

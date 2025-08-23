@@ -55,7 +55,7 @@ struct RegularModeView: View {
     
     var body: some View {
         GeometryReader { tableGeo in
-                ZStack {
+        ZStack {
             // Background
             LinearGradient(
                 gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
@@ -92,15 +92,15 @@ struct RegularModeView: View {
                         // Top row: decorative Deck (left) + functional Shoe (right)
                     HStack {
                         ZStack {
-                            VStack {
-                                Image("DeckCover")
-                                    .resizable()
-                                    .aspectRatio(0.7, contentMode: .fit)
-                                    .frame(width: 48, height: 72)
-                                    .shadow(radius: 4)
-                                Text("Deck")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
+                        VStack {
+                            Image("DeckCover")
+                                .resizable()
+                                .aspectRatio(0.7, contentMode: .fit)
+                                .frame(width: 48, height: 72)
+                                .shadow(radius: 4)
+                            Text("Deck")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
                             }
                             
                             CardCounterView(gameState: gameState)
@@ -203,7 +203,7 @@ struct RegularModeView: View {
                                                     }
                                                     .frame(width: CGFloat(handCards.count - 1) * (cardSize.width * 0.25) + cardSize.width)
                                                 } else {
-                                                    HStack(spacing: 8) {
+                        HStack(spacing: 8) {
                                                         ForEach(handCards) { card in
                                                             CardView(card: card, width: cardSize.width, glowWidth: 0)
                                                                 .opacity(0.0)
@@ -312,14 +312,14 @@ struct RegularModeView: View {
                                 gameEngine.isBust(gameState.playerHand)
                             
                             if !activeHasBlackjack && !playerBusted {
-                                BlackjackActionButtons(
-                                    gameState: gameState,
-                                    gameEngine: gameEngine,
-                                    showStrategyHints: false,
-                                    getPerfectStrategyAction: { nil }
-                                )
+                        BlackjackActionButtons(
+                            gameState: gameState,
+                            gameEngine: gameEngine,
+                            showStrategyHints: false,
+                            getPerfectStrategyAction: { nil }
+                        )
                             }
-                        }
+                    }
                     
                     Spacer()
                 }
@@ -443,6 +443,10 @@ struct RegularModeView: View {
             // Ensure deck position is set for animation
             if gameState.deckPosition == .zero {
                 gameState.deckPosition = CGPoint(x: tableSize.width * 0.5, y: tableSize.height * 0.5)
+            }
+            // Initialize numberOfDecks if not set
+            if gameState.numberOfDecks == 0 {
+                gameState.numberOfDecks = numberOfDecks
             }
                 _ = UIImage(named: "DeckCover")
                 ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) }
@@ -834,10 +838,52 @@ struct RegularModeSettingsTabView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .frame(width: 220)
-                    .onChange(of: numberOfDecks) { _ in
+                    .disabled(gameState.isDealing || 
+                             (gameState.isPlayerTurn && !gameState.playerHand.isEmpty))
+                    .onChange(of: numberOfDecks) { newValue in
+                        // Check if game is finished (result message shown)
+                        let isGameFinished = gameState.resultMessage != nil
+                        
+                        // If game is finished, wait 2 seconds before allowing deck change
+                        if isGameFinished {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                // Double-check that game is still finished after delay
+                                if gameState.resultMessage != nil {
+                                    // Game is still finished, safe to change decks
+                                    gameState.dealtPlayerCards.removeAll()
+                                    gameState.dealtDealerCards.removeAll()
+                                    gameState.playerHand.removeAll()
+                                    gameState.dealerHand.removeAll()
+                                    gameState.visuallyRevealedDealerHand.removeAll()
+                                    gameState.resultMessage = nil
+                                    gameState.showNextHand = false
+                                    
+                                    gameState.numberOfDecks = newValue
+                                    // Store current deck position before reset
+                                    let currentDeckPosition = gameState.deckPosition
+                                    gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
+                                    // Restore the deck position for animation after reset
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        gameState.deckPosition = currentDeckPosition
+                                    }
+                                }
+                            }
+                            return
+                        }
+                        
+                        // Game is not finished, safe to change decks immediately
+                        gameState.dealtPlayerCards.removeAll()
+                        gameState.dealtDealerCards.removeAll()
+                        gameState.playerHand.removeAll()
+                        gameState.dealerHand.removeAll()
+                        gameState.visuallyRevealedDealerHand.removeAll()
+                        gameState.resultMessage = nil
+                        gameState.showNextHand = false
+                        
+                        gameState.numberOfDecks = newValue
                         // Store current deck position before reset
                         let currentDeckPosition = gameState.deckPosition
-                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
                         // Restore the deck position for animation after reset
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             gameState.deckPosition = currentDeckPosition

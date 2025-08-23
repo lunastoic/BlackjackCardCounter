@@ -21,6 +21,7 @@ class BlackjackGameState: ObservableObject {
     @Published var cardsDealt: Int = 0
     @Published var runningCount: Int = 0
     @Published var isTrainingMode: Bool = false
+    @Published var numberOfDecks: Int = 0
     
     // Betting state
     @Published var playerBet: Int = 0
@@ -118,6 +119,7 @@ class BlackjackGameState: ObservableObject {
     
     // Reset game state
     func resetGame() {
+        let currentNumberOfDecks = numberOfDecks // Preserve the deck count
         deck = []
         playerHand = []
         dealerHand = []
@@ -158,6 +160,7 @@ class BlackjackGameState: ObservableObject {
         debugPayoutMessage = nil
         showDebugPayout = false
         flippedDealerCards.removeAll()
+        numberOfDecks = currentNumberOfDecks // Restore the deck count
     }
     
     // Reset for new hand
