@@ -440,6 +440,10 @@ struct RegularModeView: View {
         .onAppear {
             gameState.isTrainingMode = false
             tableSize = tableGeo.size
+            // Ensure deck position is set for animation
+            if gameState.deckPosition == .zero {
+                gameState.deckPosition = CGPoint(x: tableSize.width * 0.5, y: tableSize.height * 0.5)
+            }
                 _ = UIImage(named: "DeckCover")
                 ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) }
             gameEngine.resetDeck(gameState: gameState)
@@ -831,7 +835,13 @@ struct RegularModeSettingsTabView: View {
                     .pickerStyle(SegmentedPickerStyle())
                     .frame(width: 220)
                     .onChange(of: numberOfDecks) { _ in
+                        // Store current deck position before reset
+                        let currentDeckPosition = gameState.deckPosition
                         gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                        // Restore the deck position for animation after reset
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            gameState.deckPosition = currentDeckPosition
+                        }
                     }
                 }
             }
