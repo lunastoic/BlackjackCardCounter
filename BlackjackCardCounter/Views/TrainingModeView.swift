@@ -506,7 +506,7 @@ struct TrainingModeView: View {
                             .shadow(radius: 6)
                     }
                     .padding(.trailing, 8)
-                    .offset(y: -230)
+                    .offset(y: -207)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .center)
