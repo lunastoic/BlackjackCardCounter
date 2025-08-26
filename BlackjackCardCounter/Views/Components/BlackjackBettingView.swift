@@ -66,7 +66,9 @@ struct BlackjackBettingView: View {
             // Win/Lose/Push message
             if let result = gameState.resultMessage {
                 if gameState.lastPayout > 0 {
-                    Text("Win $\(gameState.lastPayout)")
+                    // For split hands, show the total winning amount; otherwise show actual winnings
+                    let displayAmount = gameState.isSplit ? gameState.winningAmount : gameState.actualWinnings
+                    Text("Win $\(displayAmount)")
                         .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(Color(hex: "00FF41"))
                         .multilineTextAlignment(.center)
@@ -78,7 +80,9 @@ struct BlackjackBettingView: View {
                         .multilineTextAlignment(.center)
                         .offset(y: -8)
                 } else {
-                    Text("Push")
+                    // Push - show the amount you get back
+                    let pushAmount = gameState.isSplit ? gameState.playerBet / gameState.splitHands.count : gameState.playerBet
+                    Text("Push $\(pushAmount)")
                         .font(.fixedSystem(size: 18, weight: .bold))
                         .foregroundColor(.yellow)
                         .multilineTextAlignment(.center)

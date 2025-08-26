@@ -18,6 +18,8 @@ class BlackjackGameState: ObservableObject {
     @Published var dealtDealerCards: [Card] = []
     @Published var flippedDealerCards: Set<Int> = []
     @Published var lastPayout: Int = 0
+    @Published var actualWinnings: Int = 0
+    @Published var winningAmount: Int = 0
     @Published var cardsDealt: Int = 0
     @Published var runningCount: Int = 0
     @Published var isTrainingMode: Bool = false
@@ -134,6 +136,8 @@ class BlackjackGameState: ObservableObject {
         dealtPlayerCards = []
         dealtDealerCards = []
         lastPayout = 0
+        actualWinnings = 0
+        winningAmount = 0
         cardsDealt = 0
         runningCount = 0
         playerBet = 0

@@ -26,9 +26,17 @@ struct ContentView: View {
                     GameHeaderView()
                     
                     // Title
-                    Text("Blackjack Card Counter")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.white)
+                    if let _ = UIImage(named: "BlackJack Card Counter") {
+                        Image("BlackJack Card Counter")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 105)
+                            .frame(maxWidth: 394)
+                    } else {
+                        Text("Blackjack Card Counter")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                     
                     // Home screen image with rewards button overlay
                     ZStack {

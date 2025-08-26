@@ -34,7 +34,7 @@ struct RegularModeView: View {
     private let cardSpacing: CGFloat = 70
     private let dealerYOffset: CGFloat = -43
     private let playerYOffset: CGFloat = -7
-    private let splitYOffset: CGFloat = 4   // ↓ lower split cards by 4pt
+    private let splitYOffset: CGFloat = 12   // ↓ lower split cards by 12pt
 
     // Animations
     private let travelAnim = Animation.easeInOut(duration: 0.50)
@@ -186,7 +186,6 @@ struct RegularModeView: View {
                                                     Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
                                                         .font(.fixedSystem(size: 12, weight: .regular))
                             .foregroundColor(.yellow)
-                                                        .offset(y: -6)
                                                 }
 
                                                 // Hidden placeholder rows (keep layout)
@@ -424,17 +423,19 @@ struct RegularModeView: View {
                     ForEach(gameState.splitHands.indices, id: \.self) { handIdx in
                         ForEach(Array(gameState.splitHands[handIdx].enumerated()), id: \.element.id) { cIdx, card in
                             if !gameState.animatingCards.keys.contains(card.id) {
-                                let pos = finalSplitPositions[handIdx][card.id] ?? splitStaticPosition(handIndex: handIdx, cardIndex: cIdx)
+                                let pos = finalSplitPositions[handIdx][card.id] ?? splitStaticPosition(handIndex: handIdx, cardIndex: cIdx, totalCards: gameState.splitHands[handIdx].count)
+                                let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
                                 FlipCardView(card: card, isFlipped: true, width: cardSize.width, glowWidth: 0)
                                     .matchedGeometryEffect(id: card.id, in: mgCards)
                                     .position(pos)
+                                    .zIndex(zIndex)
                                     .opacity(collectingCardIds.contains(card.id) ? 0 : 1)
                                     .allowsHitTesting(false)
                                     .transition(.identity)
-            }
-        }
-                    }
                             }
+                        }
+                    }
+                }
         }
                 .coordinateSpace(name: "table")
         .onAppear {
@@ -472,12 +473,29 @@ struct RegularModeView: View {
                 gameEngine.splitAnimationCallback = { [weak gameState] card, handIndex, completion in
                     guard let gameState = gameState else { return }
                     let countBefore = gameState.splitHands[handIndex].count
-                    let destination = splitStaticPosition(handIndex: handIndex, cardIndex: countBefore)
+                    let destination = splitStaticPosition(handIndex: handIndex, cardIndex: countBefore, totalCards: countBefore + 1)
                     finalSplitPositions[handIndex][card.id] = destination
+                    
+                    print("🎯 Split Animation: card=\(card.rank.rawValue)\(card.suit.rawValue), handIndex=\(handIndex), destination=\(destination), deckPosition=\(gameState.deckPosition)")
 
-                    animateHitCard(card: card, to: destination) {
-                        withAnimation(.easeInOut(duration: 0.001)) { completion() }
-                        cleanupAnimatedCard(card.id)
+                    // Use the same animation logic as regular hit cards
+                    let id = card.id
+                    gameState.animatingCardPositions[id] = gameState.deckPosition
+                    gameState.cardFlipRotations[id] = 0
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { gameState.animatingCards[id] = card }
+                    
+                    print("🎯 Split AnimateHitCard: card=\(card.rank.rawValue)\(card.suit.rawValue), from=\(gameState.deckPosition), to=\(destination), animatingCards.count=\(gameState.animatingCards.count)")
+
+                    withAnimation(travelAnim) { gameState.animatingCardPositions[id] = destination }
+
+                    let travelT: Double = 0.50
+                    DispatchQueue.main.asyncAfter(deadline: .now() + travelT) {
+                        withAnimation(self.flipAnim) { self.gameState.cardFlipRotations[id] = 180 }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                            withAnimation(.easeInOut(duration: 0.001)) { completion() }
+                            self.cleanupAnimatedCard(card.id)
+                        }
                     }
                 }
             }
@@ -594,23 +612,15 @@ struct RegularModeView: View {
     }
     
     // MARK: - Split landing positions
-    private func splitStaticPosition(handIndex: Int, cardIndex: Int) -> CGPoint {
-        // handIndex: 0 = left, 1 = right (visual)
-        let midX = tableSize.width * 0.5
-        let gap: CGFloat = 180
-        let centerX = (handIndex == 0) ? (midX - gap/2) : (midX + gap/2)
-        let y = yForHand(isPlayer: true, size: tableSize) + splitYOffset  // ↓ apply 4pt offset
-
-        if cardIndex <= 1 {
-            // two-slot layout for first two cards
-            let start = centerX - (cardSpacing / 2)
-            let x = start + CGFloat(cardIndex) * cardSpacing
-            return CGPoint(x: x, y: y)
-        } else {
-            // overlapping for 3rd+ in the same hand
-            let x = centerX + CGFloat(cardIndex - 1) * (cardSize.width * 0.25)
-            return CGPoint(x: x, y: y)
-        }
+    private func splitStaticPosition(handIndex: Int, cardIndex: Int, totalCards: Int) -> CGPoint {
+        // Use the new SplitCardLayout for stacking logic
+        return SplitCardLayout.shared.getSplitCardPosition(
+            handIndex: handIndex,
+            cardIndex: cardIndex,
+            totalCards: totalCards,
+            tableSize: tableSize,
+            cardSize: cardSize
+        )
     }
 
     // MARK: - Position management
@@ -657,6 +667,8 @@ struct RegularModeView: View {
         gameState.cardFlipRotations[id] = 0
         var t = Transaction(); t.disablesAnimations = true
         withTransaction(t) { gameState.animatingCards[id] = card }
+        
+        print("🎯 AnimateHitCard: card=\(card.rank.rawValue)\(card.suit.rawValue), from=\(gameState.deckPosition), to=\(destination), animatingCards.count=\(gameState.animatingCards.count)")
 
         withAnimation(travelAnim) { gameState.animatingCardPositions[id] = destination }
 

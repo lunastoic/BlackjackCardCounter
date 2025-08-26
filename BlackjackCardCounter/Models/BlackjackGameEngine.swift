@@ -125,27 +125,46 @@ class BlackjackGameEngine: ObservableObject {
 
         if gameState.isSplit {
             let newCard = gameState.deck.removeFirst()
-            gameState.splitHands[gameState.activeHandIndex].append(newCard)
             gameState.runningCount += newCard.countValue
             gameState.cardsDealt += 1
             
-            // Check for bust immediately on split hand
-            let splitHandBusted = isBust(gameState.splitHands[gameState.activeHandIndex])
+            // Check for bust immediately on split hand (before animation)
+            let splitHandBusted = isBust(gameState.splitHands[gameState.activeHandIndex] + [newCard])
             if splitHandBusted {
-                print("🎯 Split hand busted with \(handValue(gameState.splitHands[gameState.activeHandIndex])) - proceeding to next hand")
+                print("🎯 Split hand will bust with \(handValue(gameState.splitHands[gameState.activeHandIndex] + [newCard])) - proceeding to next hand")
             }
             
-            // Add a delay before unlocking to prevent rapid tapping
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                gameState.isProcessingAction = false
-                print("🎯 hitAction: Split processing unlocked")
-            }
-            
-            if splitHandBusted {
-                nextSplitHandOrDealer(gameState: gameState)
+            if let splitCB = splitAnimationCallback {
+                splitCB(newCard, gameState.activeHandIndex) {
+                    gameState.splitHands[gameState.activeHandIndex].append(newCard)
+                    
+                    // Unlock after animation completes
+                    gameState.isProcessingAction = false
+                    print("🎯 hitAction: Split animation processing unlocked")
+                    
+                    if splitHandBusted {
+                        self.nextSplitHandOrDealer(gameState: gameState)
+                    } else {
+                        // Check if hand has 21 and should auto-advance
+                        self.checkSplitHandAutoAdvance(gameState: gameState)
+                    }
+                }
             } else {
-                // Check if hand has 21 and should auto-advance
-                checkSplitHandAutoAdvance(gameState: gameState)
+                // Fallback if no animation callback
+                gameState.splitHands[gameState.activeHandIndex].append(newCard)
+                
+                // Add a delay before unlocking to prevent rapid tapping
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    gameState.isProcessingAction = false
+                    print("🎯 hitAction: Split fallback processing unlocked")
+                }
+                
+                if splitHandBusted {
+                    self.nextSplitHandOrDealer(gameState: gameState)
+                } else {
+                    // Check if hand has 21 and should auto-advance
+                    self.checkSplitHandAutoAdvance(gameState: gameState)
+                }
             }
                 } else {
             let newCard = gameState.deck.removeFirst()
@@ -303,6 +322,7 @@ class BlackjackGameEngine: ObservableObject {
             }
             
             gameState.runningCount += card.countValue
+            gameState.cardsDealt += 1  // Add this line to count split cards
 
             if let splitCB = splitAnimationCallback {
                 splitCB(card, handIndex) {
@@ -403,14 +423,41 @@ class BlackjackGameEngine: ObservableObject {
             let handBet = gameState.playerBet / gameState.splitHands.count
             let playerVals = gameState.splitHands.map { self.handValue($0) }
             let dealerVal = self.handValue(gameState.dealerHand)
+            var totalWinningAmount = 0
             
             for (i, val) in playerVals.enumerated() {
                 let handNumber = i == 1 ? 1 : 2  // Match display logic: index 1 = Hand 1, index 0 = Hand 2
-                if val > 21 { msg += "Hand \(handNumber): Bust!\n"; payout -= handBet }
-                else if dealerVal > 21 || val > dealerVal { msg += "Hand \(handNumber): Win!\n"; payout += handBet }
-                else if val == dealerVal { msg += "Hand \(handNumber): Push.\n" }
-                else { msg += "Hand \(handNumber): Lose.\n"; payout -= handBet }
+                let hand = gameState.splitHands[i]
+                
+                // Check for 21 on this split hand (not natural blackjack)
+                let has21 = val == 21
+                
+                if val > 21 { 
+                    msg += "Hand \(handNumber): Bust!\n"; 
+                    payout -= handBet 
+                }
+                else if val == dealerVal { 
+                    msg += "Hand \(handNumber): Push.\n"; 
+                    payout += handBet 
+                }
+                else if has21 { 
+                    msg += "Hand \(handNumber): 21!\n"; 
+                    payout += handBet * 2 // Split hands with 21 get 1:1 payout (double)
+                    totalWinningAmount += handBet * 2 // Track winning amount for display
+                }
+                else if dealerVal > 21 || val > dealerVal { 
+                    msg += "Hand \(handNumber): Win!\n"; 
+                    payout += handBet * 2 
+                    totalWinningAmount += handBet * 2 // Track winning amount for display
+                }
+                else { 
+                    msg += "Hand \(handNumber): Lose.\n"; 
+                    payout -= handBet 
+                }
             }
+            
+            // Set the winning amount for display (total amount won on winning hands)
+            gameState.winningAmount = totalWinningAmount
         } else {
             let playerVal = handValue(gameState.playerHand)
             let dealerVal = handValue(gameState.dealerHand)
@@ -423,12 +470,25 @@ class BlackjackGameEngine: ObservableObject {
                 let win = Int(Double(gameState.playerBet) * 1.5)
                 msg = "Blackjack!"
                 payout = gameState.playerBet + win
-            } else if dealerVal > 21 || playerVal > dealerVal { payout = gameState.playerBet }
+            } else if dealerVal > 21 || playerVal > dealerVal { payout = gameState.playerBet * 2 }
             else if playerVal == dealerVal { payout = 0 }
             else { payout = -gameState.playerBet }
         }
         
         gameState.lastPayout = payout
+        
+        // Calculate actual winnings for display (total amount won = bet + winnings)
+        if payout > 0 {
+            gameState.actualWinnings = payout // payout already includes bet + winnings
+            print("💰 WIN: payout=\(payout), actualWinnings=\(gameState.actualWinnings), playerBet=\(gameState.playerBet)")
+        } else if payout == 0 {
+            gameState.actualWinnings = 0 // Push - no winnings
+            print("💰 PUSH: payout=\(payout), actualWinnings=\(gameState.actualWinnings)")
+        } else {
+            gameState.actualWinnings = 0 // Loss - no winnings
+            print("💰 LOSS: payout=\(payout), actualWinnings=\(gameState.actualWinnings)")
+        }
+        
         handleGameResult(gameState: gameState, payout: payout)
         gameState.resultMessage = msg
     }

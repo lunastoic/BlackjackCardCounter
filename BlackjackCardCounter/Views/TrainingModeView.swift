@@ -26,7 +26,7 @@ struct TrainingModeView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
-                .ignoresSafeArea(.all, edges: .all)
+            .ignoresSafeArea(.all, edges: .all)
             
             // Background text - arched like a rainbow (behind everything)
             GeometryReader { geo in
@@ -95,7 +95,7 @@ struct TrainingModeView: View {
                          xOffset: UIDevice.current.userInterfaceIdiom == .pad ? -330 : -154,
                          yOffset: UIDevice.current.userInterfaceIdiom == .pad ? 510 : 443
                      )
-                 }
+                }
                 
                 // Visualizers at the top
                 VStack(spacing: 8) {
@@ -116,7 +116,8 @@ struct TrainingModeView: View {
                                     BarChartView(
                                         data: strategyHelper.cardsDealtByValue(
                                             dealtPlayerCards: gameState.dealtPlayerCards,
-                                            dealtDealerCards: gameState.dealtDealerCards
+                                            dealtDealerCards: gameState.dealtDealerCards,
+                                            flippedDealerCards: gameState.flippedDealerCards
                                         ),
                                         maxBarHeight: 36,
                                         barColor: .green,
@@ -244,9 +245,33 @@ struct TrainingModeView: View {
                             Spacer().frame(height: 250)
                         }
                         
+                        // Get training mode status
+                        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+                        
+                        // Show betting areas only if training mode is disabled
+                        if !trainingModeEnabled {
+                        // Betting area
+                        BlackjackBettingView(
+                            gameState: gameState,
+                            bettingManager: bettingManager,
+                            gameEngine: gameEngine
+                        )
+                        .disabled(gameState.isDealing)
+                        
+                        // Chips at the bottom (always visible before a hand is dealt or after a round is over)
+                        if !gameState.showNextHand {
+                            ChipSelectionView(
+                                gameState: gameState,
+                                bettingManager: bettingManager
+                            )
+                            .disabled(gameState.isDealing)
+                            }
+                        }
+                        
+                        Spacer().frame(height: 24)
+                        
                         // Show result message after round
                         // Show action buttons only if training mode is disabled
-                        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                         
                         if gameState.showNextHand && gameState.isPlayerTurn && !trainingModeEnabled {
                             // Check if current active hand has blackjack or is busted (don't show buttons if so)
@@ -269,28 +294,6 @@ struct TrainingModeView: View {
                                     )
                                 }
                             )
-                            }
-                        }
-                        
-                        Spacer().frame(height: 24)
-                        
-                        // Show betting areas only if training mode is disabled
-                        if !trainingModeEnabled {
-                        // Betting area
-                        BlackjackBettingView(
-                            gameState: gameState,
-                            bettingManager: bettingManager,
-                            gameEngine: gameEngine
-                        )
-                        .disabled(gameState.isDealing)
-                        
-                        // Chips at the bottom (always visible before a hand is dealt or after a round is over)
-                        if !gameState.showNextHand {
-                            ChipSelectionView(
-                                gameState: gameState,
-                                bettingManager: bettingManager
-                            )
-                            .disabled(gameState.isDealing)
                             }
                         }
                         
