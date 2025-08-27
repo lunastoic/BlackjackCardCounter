@@ -173,7 +173,7 @@ struct RegularModeView: View {
                                 // Split labels + hidden placeholders only (real cards are drawn in overlay)
                                 VStack(spacing: 4) {
                                     Text(gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]))
-                                        .font(.fixedSystem(size: 15, weight: .regular)).foregroundColor(.yellow)
+                                        .font(.system(size: 17, weight: .bold)).foregroundColor(.yellow)
                                         .offset(y: -6)
 
                                     HStack(spacing: 24) {
@@ -181,35 +181,26 @@ struct RegularModeView: View {
                                             VStack {
                                                 HStack {
                                                     Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
-                                                        .font(.fixedSystem(size: 12, weight: .regular))
-                                                        .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
+                                                        .font(.headline).foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
                                                     Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
-                                                        .font(.fixedSystem(size: 12, weight: .regular))
+                                                        .font(.system(size: 17, weight: .bold))
                             .foregroundColor(.yellow)
                                                 }
 
-                                                // Hidden placeholder rows (keep layout)
+                                                // Fixed-width placeholder (prevents layout shifts)
                                                 let handCards = gameState.splitHands[idx]
-                                                let overlap = handCards.count > 4
-                                                if overlap {
-                                                    ZStack {
-                                                        ForEach(Array(handCards.enumerated()), id: \.element.id) { i, card in
-                                                            CardView(card: card, width: cardSize.width, glowWidth: 0)
-                                                                .offset(x: CGFloat(i) * (cardSize.width * 0.25))
-                                                                .opacity(0.0)
-                                                                .transaction { $0.animation = nil }
-                                                        }
-                                                    }
-                                                    .frame(width: CGFloat(handCards.count - 1) * (cardSize.width * 0.25) + cardSize.width)
-                                                } else {
-                        HStack(spacing: 8) {
-                                                        ForEach(handCards) { card in
-                                                            CardView(card: card, width: cardSize.width, glowWidth: 0)
-                                                                .opacity(0.0)
-                                                                .transaction { $0.animation = nil }
-                                                        }
-                                                    }
-                                                }
+                                                
+                                                // Ask the layout for the hand's framed width (already constrained)
+                                                let frame = SplitCardLayout.shared.getSplitHandFrame(
+                                                    handIndex: idx,
+                                                    cardCount: handCards.count,
+                                                    cardSize: cardSize,
+                                                    tableSize: tableSize
+                                                )
+                                                
+                                                // Reserve only this space; no invisible cards that expand with count
+                                                Color.clear
+                                                    .frame(width: frame.width, height: frame.height)
                                             }
                                         }
                                     }
@@ -339,43 +330,46 @@ struct RegularModeView: View {
             ForEach(Array(gameState.animatingCards.keys), id: \.self) { cardId in
                     if let card = gameState.animatingCards[cardId],
                        let pos = gameState.animatingCardPositions[cardId] {
+                        
+                        // Only show animated cards for non-split hands (split cards are in overlay)
+                        if !gameState.isSplit {
+                            let core = ZStack {
+                            Image(card.imageName)
+                                .resizable()
+                                .aspectRatio(0.7, contentMode: .fit)
+                                    .frame(width: cardSize.width, height: cardSize.height)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(radius: 3)
+                                    .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
+                                    .rotation3DEffect(
+                                        .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
+                                        axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                    )
 
-                        let core = ZStack {
-                        Image(card.imageName)
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                                .frame(width: cardSize.width, height: cardSize.height)
+                            Image("DeckCover")
+                                .resizable()
+                                .aspectRatio(0.7, contentMode: .fit)
+                                    .frame(width: cardSize.width, height: cardSize.height)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(radius: 3)
+                                    .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
+                                    .rotation3DEffect(
+                                        .degrees(gameState.cardFlipRotations[cardId] ?? 0),
+                                        axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                    )
+                                    .allowsHitTesting(false)
+                                    .zIndex(-1)
+                            }
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 3)
-                                .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
-                                .rotation3DEffect(
-                                    .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
-                                    axis: (x: 0, y: 1, z: 0), perspective: 0.6
-                                )
+                            .allowsHitTesting(false)
 
-                        Image("DeckCover")
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                                .frame(width: cardSize.width, height: cardSize.height)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 3)
-                                .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
-                                .rotation3DEffect(
-                                    .degrees(gameState.cardFlipRotations[cardId] ?? 0),
-                                    axis: (x: 0, y: 1, z: 0), perspective: 0.6
-                                )
-                                .allowsHitTesting(false)
-                                .zIndex(-1)
+                            Group {
+                                if isCollectingPhase { core.position(pos) }
+                                else { core.matchedGeometryEffect(id: card.id, in: mgCards).position(pos) }
+                            }
+                            .allowsHitTesting(false)
+                            .zIndex(1000 + Double(arrivalOrder[cardId] ?? 0)) // Much higher z-index for animated cards
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .allowsHitTesting(false)
-
-                        Group {
-                            if isCollectingPhase { core.position(pos) }
-                            else { core.matchedGeometryEffect(id: card.id, in: mgCards).position(pos) }
-                        }
-                        .allowsHitTesting(false)
-                        .zIndex(100 + Double(arrivalOrder[cardId] ?? 0))
                     }
                 }
 
@@ -514,9 +508,10 @@ struct RegularModeView: View {
                     )
                 }
                 
-                // Split cards overlay - completely isolated from layout
+                // Split cards overlay - back to working approach
                 if gameState.isSplit {
                     ZStack {
+                        // Static split cards
                         ForEach(gameState.splitHands.indices, id: \.self) { handIdx in
                             ForEach(Array(gameState.splitHands[handIdx].enumerated()), id: \.element.id) { cIdx, card in
                                 if !gameState.animatingCards.keys.contains(card.id) {
@@ -530,6 +525,50 @@ struct RegularModeView: View {
                                         .allowsHitTesting(false)
                                         .transition(.identity)
                                 }
+                            }
+                        }
+                        
+                        // Animated split cards (in the same overlay)
+                        ForEach(Array(gameState.animatingCards.keys), id: \.self) { cardId in
+                            if let card = gameState.animatingCards[cardId],
+                               let pos = gameState.animatingCardPositions[cardId] {
+                                
+                                let core = ZStack {
+                                    Image(card.imageName)
+                                        .resizable()
+                                        .aspectRatio(0.7, contentMode: .fit)
+                                        .frame(width: cardSize.width, height: cardSize.height)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .shadow(radius: 3)
+                                        .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
+                                        .rotation3DEffect(
+                                            .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
+                                            axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                        )
+
+                                    Image("DeckCover")
+                                        .resizable()
+                                        .aspectRatio(0.7, contentMode: .fit)
+                                        .frame(width: cardSize.width, height: cardSize.height)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .shadow(radius: 3)
+                                        .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
+                                        .rotation3DEffect(
+                                            .degrees(gameState.cardFlipRotations[cardId] ?? 0),
+                                            axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                        )
+                                        .allowsHitTesting(false)
+                                        .zIndex(-1)
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .allowsHitTesting(false)
+
+                                Group {
+                                    if isCollectingPhase { core.position(pos) }
+                                    else { core.matchedGeometryEffect(id: card.id, in: mgCards).position(pos) }
+                                }
+                                .allowsHitTesting(false)
+                                .zIndex(1000 + Double(arrivalOrder[cardId] ?? 0)) // Higher z-index for animated cards
                             }
                         }
                     }
@@ -616,7 +655,11 @@ struct RegularModeView: View {
         }
     }
     
-    // MARK: - Split landing positions
+
+    
+
+    
+    // MARK: - Split landing positions (keeping for compatibility)
     private func splitStaticPosition(handIndex: Int, cardIndex: Int, totalCards: Int) -> CGPoint {
         // Use the new SplitCardLayout for stacking logic
         return SplitCardLayout.shared.getSplitCardPosition(
