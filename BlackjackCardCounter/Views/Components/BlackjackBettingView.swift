@@ -9,7 +9,7 @@ struct BlackjackBettingView: View {
     var body: some View {
         VStack(spacing: 8) {
             Text("Betting Area")
-                .font(.fixedSystem(size: 15, weight: .regular))
+                .font(.headline)
                 .foregroundColor(.white)
             
             ZStack {
