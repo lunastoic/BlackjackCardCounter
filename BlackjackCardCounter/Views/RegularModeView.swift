@@ -418,24 +418,7 @@ struct RegularModeView: View {
             }
         }
 
-                // ---- Static cards (SPLIT) — autolock with matchedGeometryEffect ----
-                if gameState.isSplit {
-                    ForEach(gameState.splitHands.indices, id: \.self) { handIdx in
-                        ForEach(Array(gameState.splitHands[handIdx].enumerated()), id: \.element.id) { cIdx, card in
-                            if !gameState.animatingCards.keys.contains(card.id) {
-                                let pos = finalSplitPositions[handIdx][card.id] ?? splitStaticPosition(handIndex: handIdx, cardIndex: cIdx, totalCards: gameState.splitHands[handIdx].count)
-                                let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
-                                FlipCardView(card: card, isFlipped: true, width: cardSize.width, glowWidth: 0)
-                                    .matchedGeometryEffect(id: card.id, in: mgCards)
-                                    .position(pos)
-                                    .zIndex(zIndex)
-                                    .opacity(collectingCardIds.contains(card.id) ? 0 : 1)
-                                    .allowsHitTesting(false)
-                                    .transition(.identity)
-                            }
-                        }
-                    }
-                }
+                // Split cards moved to overlay - see below
         }
                 .coordinateSpace(name: "table")
         .onAppear {
@@ -529,6 +512,28 @@ struct RegularModeView: View {
                         gameState: gameState,
                         gameEngine: gameEngine
                     )
+                }
+                
+                // Split cards overlay - completely isolated from layout
+                if gameState.isSplit {
+                    ZStack {
+                        ForEach(gameState.splitHands.indices, id: \.self) { handIdx in
+                            ForEach(Array(gameState.splitHands[handIdx].enumerated()), id: \.element.id) { cIdx, card in
+                                if !gameState.animatingCards.keys.contains(card.id) {
+                                    let pos = finalSplitPositions[handIdx][card.id] ?? splitStaticPosition(handIndex: handIdx, cardIndex: cIdx, totalCards: gameState.splitHands[handIdx].count)
+                                    let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
+                                    FlipCardView(card: card, isFlipped: true, width: cardSize.width, glowWidth: 0)
+                                        .matchedGeometryEffect(id: card.id, in: mgCards)
+                                        .position(pos)
+                                        .zIndex(zIndex)
+                                        .opacity(collectingCardIds.contains(card.id) ? 0 : 1)
+                                        .allowsHitTesting(false)
+                                        .transition(.identity)
+                                }
+                            }
+                        }
+                    }
+                    .allowsHitTesting(false)
                 }
             }
         }
