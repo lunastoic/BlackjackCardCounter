@@ -86,12 +86,15 @@ class BlackjackGameEngine: ObservableObject {
     
     func getHandValueText(_ hand: [Card]) -> String {
         let value = handValue(hand)
+        
+        // Only show "21" for natural blackjack (first two cards = 21)
         if hand.count == 2 &&
             ((hand[0].rank == .ace && hand[1].rank.value == 10) ||
                               (hand[1].rank == .ace && hand[0].rank.value == 10)) {
             return "21"
         }
         
+        // For all other hands, just show the value
         var total = 0
         var aces = 0
         for card in hand {
@@ -211,6 +214,28 @@ class BlackjackGameEngine: ObservableObject {
     }
     
     func doubleDownAction(gameState: BlackjackGameState) {
+        if gameState.isSplit {
+            doubleDownSplitAction(gameState: gameState)
+        } else {
+            doubleDownRegularAction(gameState: gameState)
+        }
+    }
+    
+    private func doubleDownRegularAction(gameState: BlackjackGameState) {
+        // Prevent rapid button tapping
+        let now = Date()
+        let timeSinceLastAction = now.timeIntervalSince(gameState.lastActionTime)
+        
+        guard !gameState.isProcessingAction,
+              timeSinceLastAction >= 0.6 else { 
+            print("🎲 Double Down Regular: BLOCKED - processing=\(gameState.isProcessingAction), timeSince=\(timeSinceLastAction)")
+            return 
+        }
+        
+        gameState.isProcessingAction = true
+        gameState.lastActionTime = now
+        print("🎲 Double Down Regular: Processing locked at \(now)")
+        
         if gameState.deck.count > 0,
            gameState.playerHand.count == 2,
            gameState.playerBet <= XPChipManager.shared.userChips {
@@ -223,13 +248,25 @@ class BlackjackGameEngine: ObservableObject {
             gameState.isPlayerTurn = false
             print("🎲 Double Down executed - player turn ended, buttons hidden")
             
+            // Ensure deck position is set for animation
+            if gameState.deckPosition == .zero {
+                print("🎲 Double Down Regular: WARNING - deck position is zero, setting default")
+                gameState.deckPosition = CGPoint(x: UIScreen.main.bounds.width * 0.85, y: UIScreen.main.bounds.height * 0.15)
+            }
+            
             let newCard = gameState.deck.removeFirst()
             gameState.playerHand.append(newCard)
             gameState.runningCount += newCard.countValue
             
+            print("🎲 Double Down Regular: Card dealt: \(newCard.rank.rawValue)\(newCard.suit.rawValue), deckPosition: \(gameState.deckPosition)")
+            
             if let cb = hitAnimationCallback {
                 cb(newCard, true) {
                     gameState.dealtPlayerCards.append(newCard)
+                    // Unlock processing after animation completes
+                    gameState.isProcessingAction = false
+                    print("🎲 Double Down Regular: Animation processing unlocked")
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                         if self.isBust(gameState.playerHand) {
                             self.revealDealerCard(gameState: gameState) {
@@ -241,10 +278,13 @@ class BlackjackGameEngine: ObservableObject {
                     }
                 }
             } else {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    gameState.dealtPlayerCards.append(newCard)
-                }
+                // Fallback if no animation callback - just append the card
+                gameState.dealtPlayerCards.append(newCard)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Unlock processing after fallback completes
+                    gameState.isProcessingAction = false
+                    print("🎲 Double Down Regular: Fallback processing unlocked")
+                    
                     if self.isBust(gameState.playerHand) {
                         self.revealDealerCard(gameState: gameState) {
                             self.endPlayerTurn(gameState: gameState, playerBusted: true)
@@ -252,6 +292,146 @@ class BlackjackGameEngine: ObservableObject {
                     } else {
                         self.dealerTurn(gameState: gameState)
                     }
+                }
+            }
+        }
+    }
+    
+    private func doubleDownSplitAction(gameState: BlackjackGameState) {
+        // Prevent rapid button tapping
+        let now = Date()
+        let timeSinceLastAction = now.timeIntervalSince(gameState.lastActionTime)
+        
+        guard !gameState.isProcessingAction,
+              timeSinceLastAction >= 0.6 else { 
+            print("🎲 Double Down Split: BLOCKED - processing=\(gameState.isProcessingAction), timeSince=\(timeSinceLastAction)")
+            return 
+        }
+        
+        gameState.isProcessingAction = true
+        gameState.lastActionTime = now
+        print("🎲 Double Down Split: Processing locked at \(now)")
+        
+        print("🎲 Double Down Split: Checking conditions - deck.count=\(gameState.deck.count), activeHandIndex=\(gameState.activeHandIndex), splitHands.count=\(gameState.splitHands.count)")
+        if gameState.activeHandIndex < gameState.splitHands.count {
+            print("🎲 Double Down Split: Active hand cards count=\(gameState.splitHands[gameState.activeHandIndex].count)")
+        }
+        
+        guard gameState.deck.count > 0,
+              gameState.activeHandIndex < gameState.splitHands.count,
+              gameState.splitHands[gameState.activeHandIndex].count == 2 else {
+            print("🎲 Double Down Split: Invalid conditions - deck.count=\(gameState.deck.count), activeHandIndex=\(gameState.activeHandIndex), splitHands.count=\(gameState.splitHands.count)")
+            if gameState.activeHandIndex < gameState.splitHands.count {
+                print("🎲 Double Down Split: Active hand cards count=\(gameState.splitHands[gameState.activeHandIndex].count)")
+            }
+            // Unlock processing even on failure
+            gameState.isProcessingAction = false
+            // Clean up any animation state that might be stuck
+            gameState.animatingCards.removeAll()
+            gameState.animatingCardPositions.removeAll()
+            gameState.cardFlipRotations.removeAll()
+            print("🎲 Double Down Split: Cleaned up animation state on failure")
+            return
+        }
+        
+        let activeHandBet = gameState.splitHandBets[gameState.activeHandIndex]
+        guard activeHandBet <= XPChipManager.shared.userChips else {
+            print("🎲 Double Down Split: Not enough chips. Need: \(activeHandBet), Have: \(XPChipManager.shared.userChips)")
+            // Unlock processing on chip validation failure
+            gameState.isProcessingAction = false
+            // Clean up any animation state that might be stuck
+            gameState.animatingCards.removeAll()
+            gameState.animatingCardPositions.removeAll()
+            gameState.cardFlipRotations.removeAll()
+            print("🎲 Double Down Split: Cleaned up animation state on chip validation failure")
+            return
+        }
+        
+        print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1), bet: \(activeHandBet)")
+        
+        // Deduct the additional bet for this hand
+        XPChipManager.shared.updateChips(-activeHandBet)
+        
+        // Double the bet for this specific hand
+        gameState.splitHandBets[gameState.activeHandIndex] *= 2
+        
+        // Update total player bet
+        gameState.playerBet = gameState.splitHandBets.reduce(0, +)
+        
+        print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1) bet now: \(gameState.splitHandBets[gameState.activeHandIndex]), total bet: \(gameState.playerBet)")
+        
+        // Ensure deck position is set for animation
+        if gameState.deckPosition == .zero {
+            print("🎲 Double Down Split: WARNING - deck position is zero, setting default")
+            gameState.deckPosition = CGPoint(x: UIScreen.main.bounds.width * 0.85, y: UIScreen.main.bounds.height * 0.15)
+        }
+        
+        // Deal one card to the active hand
+        let newCard = gameState.deck.removeFirst()
+        gameState.runningCount += newCard.countValue
+        gameState.cardsDealt += 1
+        
+        print("🎲 Double Down Split: Card dealt: \(newCard.rank.rawValue)\(newCard.suit.rawValue), deckPosition: \(gameState.deckPosition)")
+        
+        // Use split animation callback for proper animation
+        if let splitCB = splitAnimationCallback {
+            print("🎲 Double Down Split: Using split animation callback")
+            
+            // Add timeout protection using Timer
+            var timeoutTimer: Timer?
+            timeoutTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+                print("🎲 Double Down Split: Animation timeout - forcing completion")
+                gameState.isProcessingAction = false
+                gameState.animatingCards.removeAll()
+                gameState.animatingCardPositions.removeAll()
+                gameState.cardFlipRotations.removeAll()
+            }
+            
+            splitCB(newCard, gameState.activeHandIndex) {
+                // Cancel timeout since animation completed
+                timeoutTimer?.invalidate()
+                timeoutTimer = nil
+                
+                // Add card to the split hand after animation completes
+                gameState.splitHands[gameState.activeHandIndex].append(newCard)
+                
+                // Unlock processing after animation completes
+                gameState.isProcessingAction = false
+                print("🎲 Double Down Split: Animation processing unlocked")
+                
+                // Check if this hand busts
+                let handBusted = self.isBust(gameState.splitHands[gameState.activeHandIndex])
+                
+                if handBusted {
+                    print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1) busted")
+                    // Move to next hand or dealer
+                    self.nextSplitHandOrDealer(gameState: gameState)
+                } else {
+                    print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1) completed")
+                    // Move to next hand or dealer
+                    self.nextSplitHandOrDealer(gameState: gameState)
+                }
+            }
+        } else {
+            // Fallback if no animation callback - use simple animation
+            print("🎲 Double Down Split: Using fallback animation")
+            
+            // Add card immediately for fallback
+            gameState.splitHands[gameState.activeHandIndex].append(newCard)
+            
+            let handBusted = self.isBust(gameState.splitHands[gameState.activeHandIndex])
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Unlock processing after fallback completes
+                gameState.isProcessingAction = false
+                print("🎲 Double Down Split: Fallback processing unlocked")
+                
+                if handBusted {
+                    print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1) busted")
+                    self.nextSplitHandOrDealer(gameState: gameState)
+                } else {
+                    print("🎲 Double Down Split: Hand \(gameState.activeHandIndex + 1) completed")
+                    self.nextSplitHandOrDealer(gameState: gameState)
                 }
             }
         }
@@ -284,6 +464,7 @@ class BlackjackGameEngine: ObservableObject {
         print("🃏 Split complete - total bet now: \(gameState.playerBet) (\(gameState.playerBet/2) per hand)")
         
         gameState.splitHands = [[gameState.playerHand[0]], [gameState.playerHand[1]]]
+        gameState.splitHandBets = [gameState.playerBet / 2, gameState.playerBet / 2] // Initialize equal bets for each hand
         gameState.activeHandIndex = 1  // Start with right hand (matches dealing order)
 
         // Deal follow-up cards to RIGHT hand first, then LEFT using the same animation profile
@@ -361,7 +542,17 @@ class BlackjackGameEngine: ObservableObject {
             // Check if Hand 2 already has blackjack/21 and should auto-advance to dealer
             checkSplitHandAutoAdvance(gameState: gameState)
         } else {
-            dealerTurn(gameState: gameState)  // Left → Dealer
+            // Check if both split hands are busted
+            let hand1Busted = isBust(gameState.splitHands[1])
+            let hand2Busted = isBust(gameState.splitHands[0])
+            
+            if hand1Busted && hand2Busted {
+                print("🃏 Both split hands busted - dealer only reveals face-down card")
+                // Both hands busted, dealer only reveals face-down card, no additional hits
+                dealerTurnRevealOnly(gameState: gameState)
+            } else {
+                dealerTurn(gameState: gameState)  // Normal dealer turn with hits
+            }
         }
     }
     
@@ -369,6 +560,16 @@ class BlackjackGameEngine: ObservableObject {
         gameState.isPlayerTurn = false
         revealDealerCard(gameState: gameState) {
             self.dealDealerCardsSequentially(gameState: gameState)
+        }
+    }
+    
+    func dealerTurnRevealOnly(gameState: BlackjackGameState) {
+        gameState.isPlayerTurn = false
+        print("🃏 Dealer turn - reveal only (both hands busted)")
+        revealDealerCard(gameState: gameState) {
+            // After revealing the face-down card, immediately end the turn
+            // No additional dealer hits since both player hands are busted
+            self.endPlayerTurn(gameState: gameState, playerBusted: true)
         }
     }
     
@@ -420,7 +621,6 @@ class BlackjackGameEngine: ObservableObject {
         var payout = 0
         
         if gameState.isSplit {
-            let handBet = gameState.playerBet / gameState.splitHands.count
             let playerVals = gameState.splitHands.map { self.handValue($0) }
             let dealerVal = self.handValue(gameState.dealerHand)
             var totalWinningAmount = 0
@@ -428,6 +628,7 @@ class BlackjackGameEngine: ObservableObject {
             for (i, val) in playerVals.enumerated() {
                 let handNumber = i == 1 ? 1 : 2  // Match display logic: index 1 = Hand 1, index 0 = Hand 2
                 let hand = gameState.splitHands[i]
+                let handBet = gameState.splitHandBets[i] // Use individual hand bet
                 
                 // Check for 21 on this split hand (not natural blackjack)
                 let has21 = val == 21
@@ -439,9 +640,19 @@ class BlackjackGameEngine: ObservableObject {
                 else if val == dealerVal { 
                     msg += "Hand \(handNumber): Push.\n"; 
                     payout += handBet 
+                    totalWinningAmount += handBet // Include push amount in total winnings
                 }
                 else if has21 { 
-                    msg += "Hand \(handNumber): 21!\n"; 
+                    // Check if it's natural blackjack (first two cards = 21)
+                    let isNaturalBlackjack = hand.count == 2 &&
+                        ((hand[0].rank == .ace && hand[1].rank.value == 10) ||
+                         (hand[1].rank == .ace && hand[0].rank.value == 10))
+                    
+                    if isNaturalBlackjack {
+                        msg += "Hand \(handNumber): 21!\n"; 
+                    } else {
+                        msg += "Hand \(handNumber): Win!\n"; 
+                    }
                     payout += handBet * 2 // Split hands with 21 get 1:1 payout (double)
                     totalWinningAmount += handBet * 2 // Track winning amount for display
                 }
@@ -456,7 +667,7 @@ class BlackjackGameEngine: ObservableObject {
                 }
             }
             
-            // Set the winning amount for display (total amount won on winning hands)
+            // Set the winning amount for display (total amount won including pushes)
             gameState.winningAmount = totalWinningAmount
         } else {
             let playerVal = handValue(gameState.playerHand)

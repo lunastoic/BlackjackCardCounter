@@ -29,6 +29,7 @@ class BlackjackGameState: ObservableObject {
     @Published var playerBet: Int = 0
     @Published var betChips: [Int] = []
     @Published var lastBet: Int? = nil
+    @Published var splitHandBets: [Int] = [] // Individual bet amounts for each split hand
     
     // Debug and overlay state
     @Published var showZeroChipsOverlay: Bool = false
@@ -103,10 +104,19 @@ class BlackjackGameState: ObservableObject {
     }
     
     var canDoubleDown: Bool {
-        // Check if we have enough chips for double down (need playerBet amount more)
-        let result = playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips
-        print("🎲 canDoubleDown: \(result) (cards: \(playerHand.count), bet: \(playerBet), availableChips: \(XPChipManager.shared.userChips))")
-        return result
+        if isSplit {
+            // For split hands, check if active hand has 2 cards and we have enough chips for that hand's bet
+            let activeHandBet = splitHandBets.isEmpty ? (playerBet / 2) : splitHandBets[activeHandIndex]
+            let activeHand = splitHands[activeHandIndex]
+            let result = activeHand.count == 2 && activeHandBet <= XPChipManager.shared.userChips
+            print("🎲 canDoubleDown (split): \(result) (handIndex: \(activeHandIndex), cards: \(activeHand.count), handBet: \(activeHandBet), availableChips: \(XPChipManager.shared.userChips))")
+            return result
+        } else {
+            // For regular hands, check if we have enough chips for double down (need playerBet amount more)
+            let result = playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips
+            print("🎲 canDoubleDown (regular): \(result) (cards: \(playerHand.count), bet: \(playerBet), availableChips: \(XPChipManager.shared.userChips))")
+            return result
+        }
     }
     
     var activeHand: [Card] {
@@ -182,6 +192,7 @@ class BlackjackGameState: ObservableObject {
         doubledDown = false
         dealtPlayerCards = []
         dealtDealerCards = []
+        splitHandBets = []
         isDealing = false
         isProcessingAction = false
         lastActionTime = Date()

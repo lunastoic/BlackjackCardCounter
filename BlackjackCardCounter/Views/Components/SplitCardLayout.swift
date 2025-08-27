@@ -15,7 +15,7 @@ class SplitCardLayout: ObservableObject {
         let centerX = (handIndex == 0) ? (midX - gap/2) : (midX + gap/2)
         // Adjust baseY for iPad vs iPhone
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-        let baseY = isIPad ? (tableSize.height * 0.40) : (tableSize.height * 0.55 - 7 + 12)
+        let baseY = isIPad ? (tableSize.height * 0.40 + 8) : (tableSize.height * 0.55 - 7 + 12 + 8)
 
         // Shift Hand 1 (right hand) to the left by 20 points
         let adjustedCenterX = (handIndex == 1) ? centerX - 20 : centerX
@@ -60,7 +60,7 @@ class SplitCardLayout: ObservableObject {
         let centerX = (handIndex == 0) ? (midX - gap/2) : (midX + gap/2)
         // Adjust baseY for iPad vs iPhone
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-        let baseY = isIPad ? (tableSize.height * 0.40) : (tableSize.height * 0.55 - 7 + 12)
+        let baseY = isIPad ? (tableSize.height * 0.40 + 8) : (tableSize.height * 0.55 - 7 + 12 + 8)
 
         // Shift Hand 1 (right hand) to the left by 20 points
         let adjustedCenterX = (handIndex == 1) ? centerX - 20 : centerX

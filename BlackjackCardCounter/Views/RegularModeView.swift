@@ -98,9 +98,11 @@ struct RegularModeView: View {
                                 .aspectRatio(0.7, contentMode: .fit)
                                 .frame(width: 48, height: 72)
                                 .shadow(radius: 4)
+                                .offset(x: -30) // Shift deck cover 30 points to the left
                             Text("Deck")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
+                                .offset(x: -30) // Shift "Deck" text 30 points to the left to match
                             }
                             
                             CardCounterView(gameState: gameState)
@@ -180,8 +182,8 @@ struct RegularModeView: View {
                                         ForEach(gameState.splitHands.indices, id: \.self) { idx in
                                             VStack {
                                                 HStack {
-                                                    Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
-                                                        .font(.headline).foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
+                                                    Text("Hand \(idx == 1 ? 1 : 2)\(isHandActive(idx) ? " (Active)" : "")")
+                                                        .font(.headline).foregroundColor(isHandActive(idx) ? .yellow : .gray)
                                                     Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
                                                         .font(.system(size: 17, weight: .bold))
                             .foregroundColor(.yellow)
@@ -228,12 +230,24 @@ struct RegularModeView: View {
                         if UIDevice.current.userInterfaceIdiom == .pad { Spacer().frame(height: 250) }
                     
                         if let result = gameState.resultMessage, !result.isEmpty {
+                            if gameState.isSplit {
+                                // Custom colored split hand results
+                                VStack(spacing: 2) {
+                                    ForEach(result.components(separatedBy: "\n").filter { !$0.isEmpty }, id: \.self) { line in
+                                        SplitHandResultView(line: line)
+                                    }
+                                }
+                                .padding(.bottom, 8)
+                                .offset(y: -5)
+                            } else {
+                                // Regular non-split results
                         Text(result)
-                                .font(.title2).fontWeight(.bold)
+                                    .font(.title2).fontWeight(.bold)
                             .foregroundColor(.yellow)
                             .multilineTextAlignment(.center)
                             .padding(.bottom, 8)
-                                .offset(y: -5)
+                                    .offset(y: -5)
+                            }
                     }
                     
                     BlackjackBettingView(
@@ -334,24 +348,24 @@ struct RegularModeView: View {
                         // Only show animated cards for non-split hands (split cards are in overlay)
                         if !gameState.isSplit {
                             let core = ZStack {
-                            Image(card.imageName)
-                                .resizable()
-                                .aspectRatio(0.7, contentMode: .fit)
+                        Image(card.imageName)
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
                                     .frame(width: cardSize.width, height: cardSize.height)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .shadow(radius: 3)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .shadow(radius: 3)
                                     .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
                                     .rotation3DEffect(
                                         .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
                                         axis: (x: 0, y: 1, z: 0), perspective: 0.6
                                     )
 
-                            Image("DeckCover")
-                                .resizable()
-                                .aspectRatio(0.7, contentMode: .fit)
+                        Image("DeckCover")
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
                                     .frame(width: cardSize.width, height: cardSize.height)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .shadow(radius: 3)
+                            .shadow(radius: 3)
                                     .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
                                     .rotation3DEffect(
                                         .degrees(gameState.cardFlipRotations[cardId] ?? 0),
@@ -658,6 +672,74 @@ struct RegularModeView: View {
 
     
 
+    
+    // MARK: - Split hand active status
+    private func isHandActive(_ handIndex: Int) -> Bool {
+        // Check if this hand is the current active hand
+        guard gameState.activeHandIndex == handIndex else { return false }
+        
+        // Check if the player can still take actions on this hand
+        let hand = gameState.splitHands[handIndex]
+        
+        // If hand has blackjack (21), it's not active
+        if gameEngine.isBlackjack(hand) {
+            return false
+        }
+        
+        // If hand is busted, it's not active
+        if gameEngine.isBust(hand) {
+            return false
+        }
+        
+        // If we're in dealer's turn (not player's turn), no hands are active
+        if !gameState.isPlayerTurn {
+            return false
+        }
+        
+        return true
+    }
+    
+    // MARK: - Split hand result color coding
+    private func colorForSplitHandResult(_ line: String) -> Color {
+        if line.contains("Win!") {
+            return Color(hex: "00FF41") // Green for wins
+        } else if line.contains("Lose.") || line.contains("Bust!") {
+            return Color(hex: "DC143C") // Red for losses/busts
+        } else if line.contains("Push.") {
+            return .yellow // Yellow for pushes
+        } else if line.contains("21!") {
+            return .yellow // Yellow for natural blackjack
+        } else {
+            return .yellow // Default yellow for other cases
+        }
+    }
+    
+    // MARK: - Split Hand Result View
+    private func SplitHandResultView(line: String) -> some View {
+        HStack(spacing: 0) {
+            // Extract hand label (e.g., "Hand 1: " or "Hand 2: ")
+            if let colonIndex = line.firstIndex(of: ":") {
+                let handLabel = String(line[..<colonIndex]) + ": "
+                let result = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+                
+                // Hand label in yellow
+                Text(handLabel)
+                    .font(.title2).fontWeight(.bold)
+                    .foregroundColor(.yellow)
+                
+                // Result in appropriate color
+                Text(result)
+                    .font(.title2).fontWeight(.bold)
+                    .foregroundColor(colorForSplitHandResult(result))
+            } else {
+                // Fallback if no colon found
+                Text(line)
+                    .font(.title2).fontWeight(.bold)
+                    .foregroundColor(.yellow)
+            }
+        }
+        .multilineTextAlignment(.center)
+    }
     
     // MARK: - Split landing positions (keeping for compatibility)
     private func splitStaticPosition(handIndex: Int, cardIndex: Int, totalCards: Int) -> CGPoint {
