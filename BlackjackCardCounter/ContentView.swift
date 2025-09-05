@@ -64,6 +64,7 @@ struct ContentView: View {
                                             .frame(height: 64)
                                             .contentShape(Rectangle())
                                             .accessibilityLabel("Rewards")
+                                            .colorMultiply(rewardAvailable ? Color.white : Color.gray)
                                             .scaleEffect(animate && rewardAvailable && !hasBeenClicked ? 1.08 : 1.0)
                                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: animate)
                                     }
