@@ -128,25 +128,70 @@ struct DealNextHandButtons: View {
     let gameEngine: BlackjackGameEngine
     let bettingManager: BlackjackBettingManager
     var animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
+    @State private var showPlaceBetMessage = false
     
     var body: some View {
-        if gameState.lastBet != nil && gameState.resultMessage != nil {
-            HStack(spacing: 16) {
-                Button(action: {
-                    bettingManager.redoBet(gameState: gameState)
-                }) {
-                    Text("Redo Bet")
-                        .font(.fixedSystem(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(hex: "ff9800").opacity(bettingManager.canRedoBet(gameState: gameState) ? 0.85 : 0.3))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+        ZStack {
+            VStack(spacing: 8) {
+                if gameState.lastBet != nil && gameState.resultMessage != nil {
+                HStack(spacing: 16) {
+                    Button(action: {
+                        bettingManager.redoBet(gameState: gameState)
+                    }) {
+                        Text("Redo Bet")
+                            .font(.fixedSystem(size: 20, weight: .bold))
+                            .frame(width: 120)
+                            .padding(.horizontal)
+                            .padding(.vertical)
+                            .background(Color(hex: "ff9800").opacity(bettingManager.canRedoBet(gameState: gameState) ? 0.85 : 0.3))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                    .disabled(!bettingManager.canRedoBet(gameState: gameState))
+                    
+                    Button(action: {
+                        if gameState.isDealing { return }
+                        gameState.isDealing = true // Lock UI immediately to prevent double deal
+                        
+                        // Check if we're in RegularModeView (deck position is set)
+                        let useRegularAnimation = gameState.deckPosition != .zero
+                        gameEngine.dealInitialCards(
+                            gameState: gameState, 
+                            useRegularModeAnimation: useRegularAnimation,
+                            animationCallback: animationCallback
+                        )
+                    }) {
+                        Text("Deal Cards")
+                            .font(.fixedSystem(size: 20, weight: .bold))
+                            .frame(width: 120)
+                            .padding(.horizontal)
+                            .padding(.vertical)
+                            .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
+                    }
+                    .disabled(gameState.playerBet == 0)
                 }
-                .disabled(!bettingManager.canRedoBet(gameState: gameState))
-                
+                .frame(maxWidth: 440)
+                .padding(.horizontal)
+            } else if !gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty {
                 Button(action: {
                     if gameState.isDealing { return }
+                    
+                    // Check if user has placed a bet
+                    if gameState.playerBet == 0 {
+                        // Show notification message
+                        showPlaceBetMessage = true
+                        
+                        // Hide message after 2.1 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showPlaceBetMessage = false
+                            }
+                        }
+                        return
+                    }
+                    
                     gameState.isDealing = true // Lock UI immediately to prevent double deal
                     
                     // Check if we're in RegularModeView (deck position is set)
@@ -157,42 +202,37 @@ struct DealNextHandButtons: View {
                         animationCallback: animationCallback
                     )
                 }) {
-                    Text("Deal Cards")
-                        .font(.fixedSystem(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(16)
+                    ZStack {
+                        // Custom asset background
+                        Image("DealButton1")
+                            .renderingMode(.original)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 250, height: 48)
+                            .colorMultiply(gameState.playerBet > 0 ? Color.white : Color.gray)
+                        
+                        // Text overlay
+                        Text("Deal Cards")
+                            .font(.fixedSystem(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
-                .disabled(gameState.playerBet == 0)
+                .padding(.horizontal)
             }
-            .frame(maxWidth: 440)
-            .padding(.horizontal)
-        } else if !gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty {
-            Button(action: {
-                if gameState.isDealing { return }
-                gameState.isDealing = true // Lock UI immediately to prevent double deal
-                
-                // Check if we're in RegularModeView (deck position is set)
-                let useRegularAnimation = gameState.deckPosition != .zero
-                gameEngine.dealInitialCards(
-                    gameState: gameState, 
-                    useRegularModeAnimation: useRegularAnimation,
-                    animationCallback: animationCallback
-                )
-            }) {
-                Text("Deal Cards")
-                    .font(.fixedSystem(size: 20, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(gameState.playerBet > 0 ? Color(hex: "38b802") : Color.gray)
-                    .foregroundColor(.white)
-                    .cornerRadius(16)
             }
-            .disabled(gameState.playerBet == 0)
-            .frame(maxWidth: 440)
-            .padding(.horizontal)
+            
+            // Notification message overlay - positioned 180 points up
+            if showPlaceBetMessage {
+                Text("Place a chip first")
+                    .font(.headline)
+                    .foregroundColor(.yellow)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(12)
+                    .offset(y: -180)
+                    .transition(.opacity.combined(with: .scale))
+            }
         }
     }
 }

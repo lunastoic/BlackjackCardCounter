@@ -591,6 +591,8 @@ class BlackjackGameEngine: ObservableObject {
                         newDealtDealerCards.append(card)
                         gameState.flippedDealerCards.insert(newDealtDealerCards.count - 1)
                         gameState.dealtDealerCards = newDealtDealerCards
+                        // Update counting state immediately for additional dealer cards (no flip animation)
+                        gameState.countingRevealedDealerCards.insert(newDealtDealerCards.count - 1)
                     }
                 } else {
                     withAnimation(.easeOut(duration: 0.4)) {
@@ -598,6 +600,8 @@ class BlackjackGameEngine: ObservableObject {
                         gameState.flippedDealerCards.insert(newDealtDealerCards.count - 1)
                     }
                     gameState.dealtDealerCards = newDealtDealerCards
+                    // Update counting state immediately for additional dealer cards (no flip animation)
+                    gameState.countingRevealedDealerCards.insert(newDealtDealerCards.count - 1)
                 }
                 
                 gameState.visuallyRevealedDealerHand.append(card)
@@ -773,6 +777,7 @@ class BlackjackGameEngine: ObservableObject {
         gameState.dealtPlayerCards = []
         gameState.dealtDealerCards = []
         gameState.flippedDealerCards = [1]
+        gameState.countingRevealedDealerCards = [1] // Second dealer card is immediately visible for counting
         gameState.playerHand = []
         gameState.dealerHand = []
         gameState.visuallyRevealedDealerHand = []
@@ -928,6 +933,8 @@ class BlackjackGameEngine: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation(.easeInOut(duration: 0.6)) { gameState.flippedDealerCards.insert(0) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                // Update counting state after flip animation completes
+                gameState.countingRevealedDealerCards.insert(0)
                 if gameState.dealerHand.count > 0 {
                     gameState.visuallyRevealedDealerHand.append(gameState.dealerHand[0])
                 }

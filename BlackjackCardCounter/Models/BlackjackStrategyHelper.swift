@@ -120,7 +120,7 @@ class BlackjackStrategyHelper {
     }
     
     // Helper: Cards dealt by value
-    func cardsDealtByValue(dealtPlayerCards: [Card], dealtDealerCards: [Card], flippedDealerCards: Set<Int> = []) -> [String: Int] {
+    func cardsDealtByValue(dealtPlayerCards: [Card], dealtDealerCards: [Card], flippedDealerCards: Set<Int> = [], countingRevealedDealerCards: Set<Int> = []) -> [String: Int] {
         let allRanks: [String] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
         var counts = [String: Int]()
         
@@ -137,13 +137,13 @@ class BlackjackStrategyHelper {
         print("🎯 Card Counter Debug: dealtDealerCards count=\(dealtDealerCards.count)")
         
         if trainingModeEnabled {
-            // Only count dealer cards that are explicitly flipped (visible)
+            // Only count dealer cards that are fully revealed for counting purposes
             visibleDealerCards = dealtDealerCards.enumerated().compactMap { index, card in
-                let isFlipped = flippedDealerCards.contains(index)
-                print("🎯 Training Mode Card Check: Dealer card \(index) (\(card.rank.rawValue)) - flipped: \(isFlipped)")
-                return flippedDealerCards.contains(index) ? card : nil
+                let isCountingRevealed = countingRevealedDealerCards.contains(index)
+                print("🎯 Training Mode Card Check: Dealer card \(index) (\(card.rank.rawValue)) - counting revealed: \(isCountingRevealed)")
+                return countingRevealedDealerCards.contains(index) ? card : nil
             }
-            print("🎯 Training Mode: Visible dealer cards: \(visibleDealerCards.map { $0.rank.rawValue })")
+            print("🎯 Training Mode: Visible dealer cards for counting: \(visibleDealerCards.map { $0.rank.rawValue })")
         } else {
             // In regular mode, count all dealer cards
             visibleDealerCards = dealtDealerCards

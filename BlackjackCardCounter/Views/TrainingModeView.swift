@@ -117,7 +117,8 @@ struct TrainingModeView: View {
                                         data: strategyHelper.cardsDealtByValue(
                                             dealtPlayerCards: gameState.dealtPlayerCards,
                                             dealtDealerCards: gameState.dealtDealerCards,
-                                            flippedDealerCards: gameState.flippedDealerCards
+                                            flippedDealerCards: gameState.flippedDealerCards,
+                                            countingRevealedDealerCards: gameState.countingRevealedDealerCards
                                         ),
                                         maxBarHeight: 36,
                                         barColor: .green,
@@ -177,7 +178,7 @@ struct TrainingModeView: View {
                                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                                     FlipCardView(
                                         card: gameState.dealtDealerCards[idx],
-                                        isFlipped: trainingModeEnabled ? (idx != 0 || !gameState.isPlayerTurn) : gameState.flippedDealerCards.contains(idx),
+                                        isFlipped: gameState.flippedDealerCards.contains(idx),
                                         width: cardWidth,
                                         glowWidth: cardWidth + 10
                                     )
@@ -297,13 +298,37 @@ struct TrainingModeView: View {
                             }
                         }
                         
-                        // Deal/Next Hand Button at the very bottom (hide in training mode)
-                        if !trainingModeEnabled && (gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) {
+                        // Deal/Next Hand Button at the very bottom (show in both training and regular mode, but hide during auto play)
+                        if !isContinuousAutoPlay && (gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) {
+                            VStack(spacing: 12) {
                             DealNextHandButtons(
                                 gameState: gameState,
                                 gameEngine: gameEngine,
                                 bettingManager: bettingManager
                             )
+                                
+                                // Auto Play button (always visible in training mode, but hide during auto play)
+                                Button(action: {
+                                    // Start auto play mode (same as training mode enabled)
+                                    UserDefaults.standard.set(true, forKey: "trainingModeEnabled")
+                                    startContinuousAutoPlay()
+                                }) {
+                                    ZStack {
+                                        // Custom asset background
+                                        Image("AutoPlayButton1")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 250, height: 48)
+                                        
+                                        // Text overlay
+                                        Text("Auto Play")
+                                            .font(.fixedSystem(size: 20, weight: .bold))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                         
                         // Auto-deal in training mode
@@ -327,6 +352,7 @@ struct TrainingModeView: View {
                             if isContinuousAutoPlay {
                                 VStack(spacing: 16) {
                                     Button(action: {
+                                        stopButtonPressed = true
                                         stopContinuousAutoPlay()
                                     }) {
                                         Text("Stop")
@@ -334,7 +360,7 @@ struct TrainingModeView: View {
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 32)
                                             .padding(.vertical, 12)
-                                            .background(Color(hex: "ff0000")) // Same red as Close button
+                                            .background(stopButtonPressed ? Color.gray : Color(hex: "ff0000")) // Gray when pressed, red when normal
                                             .cornerRadius(12)
                                     }
                                     
@@ -456,7 +482,31 @@ struct TrainingModeView: View {
                         
                         // Wait a bit to see the result, then clear and deal next hand (speed adjusted with safe minimums)
                         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                            guard self.isContinuousAutoPlay else { return }
+                            // Check if stop was requested or auto play is disabled
+                            if self.stopRequested || !self.isContinuousAutoPlay {
+                                // Auto play was stopped, reset flags and return to normal mode
+                                self.isAutoPlaying = false
+                                self.isContinuousAutoPlay = false
+                                self.stopRequested = false
+                                self.stopButtonPressed = false
+                                // Disable training mode to return to normal betting interface
+                                UserDefaults.standard.set(false, forKey: "trainingModeEnabled")
+                                // Clear all game state to show clean betting interface
+                                gameState.resultMessage = nil
+                                gameState.playerHand = []
+                                gameState.dealerHand = []
+                                gameState.dealtPlayerCards = []
+                                gameState.dealtDealerCards = []
+                                gameState.visuallyRevealedDealerHand = []
+                                gameState.flippedDealerCards = []
+                                gameState.countingRevealedDealerCards = []
+                                gameState.showNextHand = false
+                                gameState.isPlayerTurn = true
+                                gameState.playerBet = 0
+                                gameState.betChips = []
+                                gameState.lastBet = nil
+                                return 
+                            }
                             
                             // Clear the current hand
                             gameState.resultMessage = nil
@@ -552,6 +602,8 @@ struct TrainingModeView: View {
             if gameState.numberOfDecks == 0 {
                 gameState.numberOfDecks = numberOfDecks
             }
+            // Ensure training mode is disabled by default when entering training mode view
+            UserDefaults.standard.set(false, forKey: "trainingModeEnabled")
         }
     }
     
@@ -560,6 +612,12 @@ struct TrainingModeView: View {
     
     // State for continuous auto-play loop
     @State private var isContinuousAutoPlay = false
+    
+    // State to track if stop was requested (allows current hand to finish)
+    @State private var stopRequested = false
+    
+    // State to track if stop button was pressed (for visual feedback)
+    @State private var stopButtonPressed = false
     
     // Speed control state (1.0 = normal, 0.5 = 2x faster, 2.0 = 2x slower)
     @State private var autoPlaySpeed: Double = 1.0
@@ -624,7 +682,7 @@ struct TrainingModeView: View {
             let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
             print("🔄 Processing Check: trainingEnabled=\(trainingModeEnabled), isContinuous=\(isContinuousAutoPlay), isPlayerTurn=\(gameState.isPlayerTurn), isAutoPlaying=\(isAutoPlaying)")
             
-            guard trainingModeEnabled && isContinuousAutoPlay && gameState.isPlayerTurn && !isAutoPlaying else {
+            guard trainingModeEnabled && (isContinuousAutoPlay || stopRequested) && gameState.isPlayerTurn && !isAutoPlaying else {
                 print("🎓 Training Mode: ❌ PROCESSING CHECK STOPPED - Conditions changed")
                 print("  - trainingEnabled: \(trainingModeEnabled)")
                 print("  - isContinuousAutoPlay: \(isContinuousAutoPlay)")
@@ -693,8 +751,13 @@ struct TrainingModeView: View {
                 print("  - isAutoPlaying: \(self.isAutoPlaying)")
                 print("  - isProcessingAction: \(gameState.isProcessingAction)")
                 
-                if handCount >= 2 && playerValue < 17 && playerValue > 0 && !self.isAutoPlaying && !gameState.isProcessingAction {
-                    print("🎓 Training Mode: ⚠️ BACKUP MONITOR DETECTED STUCK AUTO-PLAY!")
+                if handCount >= 2 && playerValue >= 17 && playerValue <= 21 && !self.isAutoPlaying && !gameState.isProcessingAction {
+                    print("🎓 Training Mode: ⚠️ BACKUP MONITOR DETECTED STUCK AUTO-PLAY AT \(playerValue)!")
+                    print("🎓 Training Mode: 🔄 FORCING STAND ACTION...")
+                    // Force stand action if player has 17+ and auto play is stuck
+                    gameEngine.standAction(gameState: gameState)
+                } else if handCount >= 2 && playerValue < 17 && playerValue > 0 && !self.isAutoPlaying && !gameState.isProcessingAction {
+                    print("🎓 Training Mode: ⚠️ BACKUP MONITOR DETECTED STUCK AUTO-PLAY AT \(playerValue)!")
                     print("🎓 Training Mode: 🔄 FORCING AUTO-PLAY CONTINUATION...")
                     self.waitForProcessingToComplete()
                 }
@@ -707,13 +770,48 @@ struct TrainingModeView: View {
     
     private func stopContinuousAutoPlay() {
         print("🎓 Stopping continuous auto-play...")
-        isContinuousAutoPlay = false
-        isAutoPlaying = false
-        // Backup monitoring will stop automatically when isContinuousAutoPlay = false
+        
+        // Set stop requested flag but keep auto play running for current hand
+        stopRequested = true
+        
+        // If no hand is currently in progress, reset immediately
+        if gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty {
+            print("🎓 No hand in progress - resetting immediately")
+            isContinuousAutoPlay = false
+            stopRequested = false
+            stopButtonPressed = false
+            isAutoPlaying = false
+            // Disable training mode to return to normal betting interface
+            UserDefaults.standard.set(false, forKey: "trainingModeEnabled")
+            // Clear all game state to show clean betting interface
+            gameState.resultMessage = nil
+            gameState.playerHand = []
+            gameState.dealerHand = []
+            gameState.dealtPlayerCards = []
+            gameState.dealtDealerCards = []
+            gameState.visuallyRevealedDealerHand = []
+            gameState.flippedDealerCards = []
+            gameState.countingRevealedDealerCards = []
+            gameState.showNextHand = false
+            gameState.isPlayerTurn = true
+            gameState.playerBet = 0
+            gameState.betChips = []
+            gameState.lastBet = nil
+        } else {
+            print("🎓 Hand in progress - will finish current hand then stop")
+            // Keep isContinuousAutoPlay = true so current hand continues
+            // The result message handler will handle the cleanup when hand finishes
+        }
+        
+        print("🎓 Auto play stop requested - current hand will finish then stop")
     }
     
     private func dealNextTrainingHand() {
-        guard isContinuousAutoPlay else { return }
+        guard isContinuousAutoPlay && !stopRequested else { 
+            // Auto play was stopped, reset the auto playing flag
+            isAutoPlaying = false
+            return 
+        }
         
         // Reset auto-play flag for new hand
         isAutoPlaying = false
@@ -752,9 +850,9 @@ struct TrainingModeView: View {
         print("🎓 Training Mode: isProcessingAction=\(gameState.isProcessingAction), handCount=\(gameState.playerHand.count)")
         print("🎓 Training Mode: isDraggingSpeed=\(isDraggingSpeed)")
         
-        // Enhanced guard conditions - but make sure we're not too restrictive
+        // Enhanced guard conditions - allow current hand to continue even if stop requested
         guard trainingModeEnabled && 
-              isContinuousAutoPlay && 
+              (isContinuousAutoPlay || stopRequested) && 
               gameState.isPlayerTurn && 
               !isAutoPlaying && 
               !gameState.isProcessingAction &&
@@ -911,12 +1009,20 @@ struct TrainingModeView: View {
             }
         } else if trainingModeEnabled && !gameState.isPlayerTurn {
             // In training mode after player turn, show full dealer hand
-            return gameEngine.getHandValueText(gameState.dealerHand)
+            // Only show cards that are fully revealed for counting purposes
+            let fullyRevealedCards = gameState.dealerHand.enumerated().compactMap { index, card in
+                return gameState.countingRevealedDealerCards.contains(index) ? card : nil
+            }
+            return gameEngine.getHandValueText(fullyRevealedCards)
         } else if gameState.isPlayerTurn {
             // During player turn, only show the second dealer card (index 1 in dealt cards, but index 0 in visually revealed)
             return gameEngine.getHandValueText([gameState.visuallyRevealedDealerHand[0]])
         } else {
-            return gameEngine.getHandValueText(gameState.visuallyRevealedDealerHand)
+            // Only show cards that are fully revealed for counting purposes
+            let fullyRevealedCards = gameState.visuallyRevealedDealerHand.enumerated().compactMap { index, card in
+                return gameState.countingRevealedDealerCards.contains(index) ? card : nil
+            }
+            return gameEngine.getHandValueText(fullyRevealedCards)
         }
     }
     
@@ -1242,16 +1348,6 @@ struct SettingsTabView: View {
                         .labelsHidden()
                 }
                 
-                HStack {
-                    Text("Training Mode Enabled:")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                    Toggle("", isOn: .init(
-                        get: { UserDefaults.standard.bool(forKey: "trainingModeEnabled") },
-                        set: { UserDefaults.standard.set($0, forKey: "trainingModeEnabled") }
-                    ))
-                        .labelsHidden()
-                }
             }
             
             Button(action: { showSettings = false }) {

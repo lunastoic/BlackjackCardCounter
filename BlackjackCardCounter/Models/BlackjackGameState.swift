@@ -17,6 +17,7 @@ class BlackjackGameState: ObservableObject {
     @Published var dealtPlayerCards: [Card] = []
     @Published var dealtDealerCards: [Card] = []
     @Published var flippedDealerCards: Set<Int> = []
+    @Published var countingRevealedDealerCards: Set<Int> = [] // Cards that are fully revealed for counting purposes
     @Published var lastPayout: Int = 0
     @Published var actualWinnings: Int = 0
     @Published var winningAmount: Int = 0
@@ -174,6 +175,7 @@ class BlackjackGameState: ObservableObject {
         debugPayoutMessage = nil
         showDebugPayout = false
         flippedDealerCards.removeAll()
+        countingRevealedDealerCards.removeAll()
         numberOfDecks = currentNumberOfDecks // Restore the deck count
     }
     
@@ -205,5 +207,6 @@ class BlackjackGameState: ObservableObject {
         cardFlipRotations.removeAll()
         cardFlipScales.removeAll()
         flippedDealerCards.removeAll()
+        countingRevealedDealerCards.removeAll()
     }
 } 
