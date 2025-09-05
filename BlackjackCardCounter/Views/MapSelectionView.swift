@@ -1,5 +1,5 @@
 import SwiftUI
- // testtt
+
 struct MapSelectionView: View {
     @State private var selectedIndex: Int = 0
     @ObservedObject private var xpManager = XPChipManager.shared
@@ -26,10 +26,7 @@ struct MapSelectionView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
-                startPoint: .top, endPoint: .bottom
-            )
+            Color(hex: "8B0000")
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
@@ -137,9 +134,107 @@ struct MapCard: View {
         let appStorageUnlocked = unlockedMaps.split(separator: ",").compactMap { Int($0) }.contains(map.id)
         return localUnlocked || appStorageUnlocked
     }
+    
+    // Computed property for map card background
+    private var mapCardBackground: AnyShapeStyle {
+        if map.name == "Luna Luxe Casino" {
+            return AnyShapeStyle(Color.clear) // Clear background for Luna Luxe Casino to use Map1Back asset
+        } else if map.name == "Io Inferno Lounge" {
+            return AnyShapeStyle(Color.clear) // Clear background for Io Inferno Lounge to use Map2B asset
+        } else if map.name == "Europa Ice Palace" {
+            return AnyShapeStyle(Color.clear) // Clear background for Europa Ice Palace to use Map3B asset
+        } else if map.name == "Titan Methane Mirage" {
+            return AnyShapeStyle(Color.clear) // Clear background for Titan Methane Mirage to use Map5B asset
+        } else if map.name == "Ganymede Grand" {
+            return AnyShapeStyle(Color.clear) // Clear background for Ganymede Grand to use Map4B asset
+        } else if map.name == "Kepler Fortune" {
+            return AnyShapeStyle(Color.clear) // Clear background for Kepler Fortune to use Map6B asset
+        } else {
+            return AnyShapeStyle(getMapColor(for: map))
+        }
+    }
 
     var body: some View {
         ZStack {
+            // Background for Luna Luxe Casino
+            if unlocked && map.name == "Luna Luxe Casino" {
+                Image("Map1Back")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Background for Io Inferno Lounge
+            if unlocked && map.name == "Io Inferno Lounge" {
+                Image("Map2B")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Background for Europa Ice Palace
+            if unlocked && map.name == "Europa Ice Palace" {
+                Image("Map3B")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Background for Titan Methane Mirage
+            if unlocked && map.name == "Titan Methane Mirage" {
+                Image("Map5B")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Background for Ganymede Grand
+            if unlocked && map.name == "Ganymede Grand" {
+                Image("Map4B")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Background for Kepler Fortune
+            if unlocked && map.name == "Kepler Fortune" {
+                Image("Map6B")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 480)
+                    .rotationEffect(.degrees(180))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+            }
+            
+            // Black background card only for unlocked maps to create border effect
+            if unlocked && map.name != "Luna Luxe Casino" && map.name != "Io Inferno Lounge" && map.name != "Europa Ice Palace" && map.name != "Titan Methane Mirage" && map.name != "Ganymede Grand" && map.name != "Kepler Fortune" {
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(Color.black)
+                    .allowsHitTesting(false)
+            }
+            
             if !unlocked || isUnlocking {
                 // Locked state: full-bleed image + dark overlay + lock button
                 Image(map.imageName)
@@ -168,11 +263,11 @@ struct MapCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 162, height: 162)
-                            .opacity(isUnlocking ? 0 : 1)
-                            .scaleEffect(isUnlocking ? 2 : 1)
+                        .opacity(isUnlocking ? 0 : 1)
+                            .scaleEffect(isUnlocking ? 1.5 : 1)
                             .offset(x: isShaking ? 8 : 0)
-                            .animation(.easeInOut(duration: 0.5), value: isUnlocking)
-                            .animation(.easeInOut(duration: 0.1).repeatCount(3, autoreverses: true), value: isShaking)
+                            .animation(.easeInOut(duration: 0.3), value: isUnlocking)
+                            .animation(.easeInOut(duration: 0.15).repeatCount(3, autoreverses: true), value: isShaking)
                             .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0) // Brighter white glow behind the lock asset
                     }
                     .frame(width: 162, height: 162)
@@ -186,20 +281,20 @@ struct MapCard: View {
                             // Show the "unlock" asset briefly, then reveal buttons
                             showUnlockIcon = true
 
-                            // Wait 0.8s, then start fade transition
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            // Wait 0.6s, then start fade transition
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                                 // Prepare unlocked state immediately (like removing a blanket)
                                 unlockAction()      // persist to AppStorage
                                 localUnlocked = true
                                 
                                 // Start fade out animation to reveal the unlocked card underneath
-                                withAnimation(.easeInOut(duration: 1.0)) {
+                                withAnimation(.easeInOut(duration: 0.6)) {
                                     showUnlockIcon = false
                                     isUnlocking = true
                                 }
                                 
                                 // After fade completes, the unlocked card is already visible
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                                     isUnlocking = false  // Complete the transition
                                 }
                             }
@@ -228,40 +323,60 @@ struct MapCard: View {
 
                     Spacer()
                 }
+                .frame(width: 300, height: 480)
+                .background(Color.clear)
             } else {
                 // Unlocked: themed rounded card + name + image box + per-map buttons
-                RoundedRectangle(cornerRadius: 32)
-                    .fill(getMapColor(for: map))
-                    .opacity(isUnlocking ? 0 : 1) // Hide during fade, show after
-                    .animation(.easeInOut(duration: 0.3), value: isUnlocking)
-
                 VStack(spacing: 0) {
-                    // Top: name + image with a 2× thicker black border around the image
+                    VStack(spacing: 0) {
+                        // Top: name + image with a 2× thicker black border around the image
                     VStack(spacing: 8) {
                         Text(map.name)
-                            .font(.fixedSystem(size: 20, weight: .bold))
+                                .font(.fixedSystem(size: 20, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                             .padding(.top, 30)
                             .padding(.horizontal, 8)
-                            .offset(y: 3)
+                                .offset(y: 3)
 
                         ZStack {
+                            if map.name == "Luna Luxe Casino" {
+                                // Black background for Luna Luxe Casino image
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(Color.black.opacity(0.3))
+                                    .frame(height: 160)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                // Black background for other maps
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.black.opacity(0.3))
                                 .frame(height: 160)
+                                    .frame(maxWidth: .infinity)
+                            }
 
                             Image(map.imageName)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(height: 160)
                                 .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .overlay(
-                                    // 2× thicker thin black border hugging the clipped image shape
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.black.opacity(0.9), lineWidth: imageBorderWidth / displayScale)
-                                )
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .overlay(
+                                        (map.name == "Luna Luxe Casino" || map.name == "Io Inferno Lounge" || map.name == "Europa Ice Palace" || map.name == "Titan Methane Mirage" || map.name == "Ganymede Grand" || map.name == "Kepler Fortune")
+                                        ? RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .stroke(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color(hex: "FFD700"),  // Bright gold
+                                                        Color(hex: "FFA500"),  // Orange gold
+                                                        Color(hex: "FFD700")   // Bright gold
+                                                    ]),
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1.0
+                                            )
+                                        : nil
+                                    )
                         }
                         .padding(.horizontal, 18)
                     }
@@ -269,505 +384,642 @@ struct MapCard: View {
 
                     Spacer(minLength: 40)
 
-                    // Per-map themed buttons (same format you sent)
+                        // Per-map themed buttons (same format you sent)
                         if map.name == "Luna Luxe Casino" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
-                                    GameModeButton(title: "Training Mode", description: "Learn with visuals and tutorials", systemImage: "book.fill")
+                                    ZStack {
+                                        Image("Map1B1")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.fixedSystem(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.fixedSystem(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.fixedSystem(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding()
+                                    }
                                 }
+                                
                                 NavigationLink(destination: RegularModeView(map: map)) {
-                                    GameModeButton(title: "Regular Mode", description: "Classic casino experience", systemImage: "play.fill")
+                                    ZStack {
+                                        Image("Map1B1")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                            }
+                                        .padding()
+                                    }
                                 }
+                                
                                 NavigationLink(destination: QuizModeView(map: map)) {
-                                    GameModeButton(title: "Quiz Mode", description: "Test your knowledge", systemImage: "questionmark.circle.fill")
+                                    ZStack {
+                                        Image("Map1B1")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding()
+                                    }
                                 }
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
                         } else if map.name == "Io Inferno Lounge" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Training Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map2B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Learn with visuals and tutorials")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.orange.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: RegularModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Regular Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map2B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Classic casino experience")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.orange.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: QuizModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Quiz Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map2B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Test your knowledge")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.orange.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
                         } else if map.name == "Europa Ice Palace" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Training Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map3B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Learn with visuals and tutorials")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "00eaff").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: RegularModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Regular Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map3B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Classic casino experience")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "00eaff").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: QuizModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Quiz Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map3B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Test your knowledge")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "00eaff").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                    } else if map.name == "Ganymede Grand" {
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
+                        } else if map.name == "Ganymede Grand" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Training Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map4B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Learn with visuals and tutorials")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.purple.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: RegularModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Regular Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map4B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Classic casino experience")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.purple.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                                 NavigationLink(destination: QuizModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Quiz Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map4B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Test your knowledge")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.purple.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
                                 }
                             }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                                                                } else if map.name == "Titan Methane Mirage" {
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
+                        } else if map.name == "Titan Methane Mirage" {
                             VStack(spacing: 14) {
                                 NavigationLink(destination: TrainingModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Training Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                    ZStack {
+                                        Image("Map5B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Learn with visuals and tutorials")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
                                 }
-                                .padding()
-                                                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.green.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
-                                }
-                            NavigationLink(destination: RegularModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Regular Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    ZStack {
+                                        Image("Map5B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Classic casino experience")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
                                 }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.green.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    ZStack {
+                                        Image("Map5B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
+                                    }
+                                }
                             }
-                            NavigationLink(destination: QuizModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Quiz Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
+                        } else if map.name == "Kepler Fortune" {
+                            VStack(spacing: 14) {
+                                NavigationLink(destination: TrainingModeView(map: map)) {
+                                    ZStack {
+                                        Image("Map6B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
                                         
-                                        Text("Test your knowledge")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
+                                        HStack {
+                                            Image(systemName: "book")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Training Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Learn with visuals and tutorials")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
                                 }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color.green.opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
+                                NavigationLink(destination: RegularModeView(map: map)) {
+                                    ZStack {
+                                        Image("Map6B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "play")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Regular Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Classic casino experience")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
+                                    }
+                                }
+                                NavigationLink(destination: QuizModeView(map: map)) {
+                                    ZStack {
+                                        Image("Map6B2")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 280, height: 60)
+                                        
+                                        HStack {
+                                            Image(systemName: "questionmark.circle")
+                                                .font(.system(size: 23, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 50)
+                                            
+                                            VStack(alignment: .leading) {
+                                                Text("Quiz Mode")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("Test your knowledge")
+                                                    .font(.system(size: 11, weight: .regular))
+                                                    .foregroundColor(.white)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding()
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 18)
+                            .opacity(1.0)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
-                                                                } else if map.name == "Kepler Fortune" {
-                            VStack(spacing: 14) {
-                                NavigationLink(destination: TrainingModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Training Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
-                                        
-                                        Text("Learn with visuals and tutorials")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "D4AF37").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
-                            }
-                            NavigationLink(destination: RegularModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Regular Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
-                                        
-                                        Text("Classic casino experience")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
-                                    }
-                                    
-                        Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "D4AF37").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
-                            }
-                            NavigationLink(destination: QuizModeView(map: map)) {
-                                HStack {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.fixedSystem(size: 23, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 50)
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text("Quiz Mode")
-                                            .font(.fixedSystem(size: 15, weight: .bold))
-                                            .foregroundColor(.white)
-                                        
-                                        Text("Test your knowledge")
-                                            .font(.fixedSystem(size: 11, weight: .regular))
-                                            .foregroundColor(.white)
-                                    }
-                                    
-                        Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .fill(Color(hex: "D4AF37").opacity(0.8))
-                                        .shadow(radius: 5)
-                                )
-            }
-        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
-                        .opacity(1.0)
-                        .scaleEffect(1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: unlocked)
                     }
                 }
+                .frame(width: 297, height: 476)
+                .background(
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(mapCardBackground)
+                )
             }
         }
         .frame(width: 300, height: 480)
-        .clipShape(RoundedRectangle(cornerRadius: 32))
+        .clipShape(RoundedRectangle(cornerRadius: (map.name == "Luna Luxe Casino" || map.name == "Io Inferno Lounge" || map.name == "Europa Ice Palace" || map.name == "Titan Methane Mirage" || map.name == "Ganymede Grand" || map.name == "Kepler Fortune") ? 12 : 32))
+        .overlay(
+            // Max bet text for all maps - positioned as overlay to not affect title
+            Group {
+                if unlocked && map.name == "Luna Luxe Casino" {
+                    Text("Max bet: $1000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                } else if unlocked && map.name == "Io Inferno Lounge" {
+                    Text("Max bet: $5000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                } else if unlocked && map.name == "Europa Ice Palace" {
+                    Text("Max bet: $10,000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                } else if unlocked && map.name == "Ganymede Grand" {
+                    Text("Max bet: $50,000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                } else if unlocked && map.name == "Titan Methane Mirage" {
+                    Text("Max bet: $250,000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                } else if unlocked && map.name == "Kepler Fortune" {
+                    Text("Max bet: $1,000,000")
+                        .font(.fixedSystem(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .offset(y: -17)
+                }
+            }
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             if unlocked {

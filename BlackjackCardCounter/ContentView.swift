@@ -9,16 +9,21 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("userChips") private var userChips: Int = 500
+    @AppStorage("lastDailyRewardDate") var lastDailyRewardDate: Double = 0
     @State private var showZeroChipsOverlay = false
     @State private var hasBeenClicked = false
+    @State private var animate = false
+    
+    var rewardAvailable: Bool {
+        let now = Date().timeIntervalSince1970
+        return now - lastDailyRewardDate > 24 * 60 * 60
+    }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient
-                LinearGradient(gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
-                             startPoint: .top,
-                             endPoint: .bottom)
+                // Background color
+                Color(hex: "8B0000")
                     .ignoresSafeArea()
                 
                 VStack(spacing: 30) {
@@ -52,7 +57,27 @@ struct ContentView: View {
                                 Spacer()
                                 ZStack {
                                     NavigationLink(destination: RewardsView()) {
-                                        RewardsButton(hasBeenClicked: $hasBeenClicked)
+                                        Image("CTRewards")
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(height: 64)
+                                            .contentShape(Rectangle())
+                                            .accessibilityLabel("Rewards")
+                                            .scaleEffect(animate && rewardAvailable && !hasBeenClicked ? 1.08 : 1.0)
+                                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: animate)
+                                    }
+                                }
+                                .onAppear {
+                                    if rewardAvailable && !hasBeenClicked {
+                                        startSpringAnimation()
+                                    }
+                                }
+                                .onChange(of: rewardAvailable) { isAvailable in
+                                    if isAvailable && !hasBeenClicked {
+                                        startSpringAnimation()
+                                    } else {
+                                        animate = false
                                     }
                                 }
                                 .padding(.trailing, 30)
@@ -65,10 +90,17 @@ struct ContentView: View {
                     }
                     .clipped()
                     
-                    // Main menu buttons
+                    // Main menu buttons (replace text buttons with image assets)
                     VStack(spacing: 20) {
+                        // Start Counting -> CTStart
                         NavigationLink(destination: MapSelectionView()) {
-                            MenuButton(title: "Start Counting", systemImage: "play.fill")
+                            Image("CTStart")
+                                .renderingMode(.original)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 64)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel("Start Counting")
                         }
                         .onTapGesture {
                             if userChips <= 0 {
@@ -76,18 +108,33 @@ struct ContentView: View {
                             }
                         }
                         
+                        // Settings -> CTSettings
                         NavigationLink(destination: SettingsView()) {
-                            MenuButton(title: "Settings", systemImage: "gear")
+                            Image("CTSettings")
+                                .renderingMode(.original)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 64)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel("Settings")
                         }
                         
+                        // How to Play -> CTHowToPlay
                         NavigationLink(destination: HowToPlayView()) {
-                            MenuButton(title: "How to Play", systemImage: "book.fill")
+                            Image("CTHowToPlay")
+                                .renderingMode(.original)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 64)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel("How to Play")
                         }
                     }
+                    .offset(y: UIDevice.current.userInterfaceIdiom == .pad ? -100 : 0) // Shift buttons up 80 points on iPad only
                 }
                 .padding()
-                .frame(maxWidth: 600) // Limit width on larger screens
-                .frame(maxWidth: .infinity) // Center the content
+                .frame(maxWidth: 600)          // Limit width on larger screens
+                .frame(maxWidth: .infinity)     // Center the content
             }
             .overlay {
                 if showZeroChipsOverlay {
@@ -97,29 +144,24 @@ struct ContentView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle()) // Force full screen on iPad
     }
-}
-
-// Custom button style for menu items
-struct MenuButton: View {
-    let title: String
-    let systemImage: String
     
-    var body: some View {
-        HStack {
-            Image(systemName: systemImage)
-                .font(.title2)
-            Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
+    private func startSpringAnimation() {
+        animate = true
+        Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { timer in
+            if rewardAvailable && !hasBeenClicked {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    animate = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        animate = false
+                    }
+                }
+            } else {
+                timer.invalidate()
+                animate = false
+            }
         }
-        .foregroundColor(.white)
-        .frame(maxWidth: 280)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 15)
-                .fill(Color(hex: "00A300"))
-                .shadow(radius: 5)
-        )
     }
 }
 
@@ -154,10 +196,12 @@ struct RewardsButton: View {
     @AppStorage("lastDailyRewardDate") var lastDailyRewardDate: Double = 0
     @State private var animate = false
     @Binding var hasBeenClicked: Bool
+    
     var rewardAvailable: Bool {
         let now = Date().timeIntervalSince1970
         return now - lastDailyRewardDate > 24 * 60 * 60
     }
+    
     var body: some View {
         ZStack {
             Text("🎁 Rewards")
@@ -185,7 +229,6 @@ struct RewardsButton: View {
                 animate = false
             }
         }
-
     }
     
     private func startSpringAnimation() {
@@ -211,3 +254,4 @@ struct RewardsButton: View {
 #Preview {
     ContentView()
 }
+

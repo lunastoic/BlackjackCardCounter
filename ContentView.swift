@@ -14,10 +14,8 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient
-                LinearGradient(gradient: Gradient(colors: [Color(hex: "1a3a1a"), Color(hex: "2d5a2d")]),
-                             startPoint: .top,
-                             endPoint: .bottom)
+                // Background color
+                Color(hex: "CC0000")
                     .ignoresSafeArea()
                 
                 VStack(spacing: 30) {
@@ -48,20 +46,38 @@ struct ContentView: View {
                     // Main menu buttons
                     VStack(spacing: 20) {
                         NavigationLink(destination: MapSelectionView()) {
-                            MenuButton(title: "Start Counting", systemImage: "play.fill")
+                            Image("CTStart")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .shadow(radius: 5)
+                                .background(Color.yellow.opacity(0.3))
                         }
-                        .onTapGesture {
+                        .simultaneousGesture(TapGesture().onEnded {
                             if userChips <= 0 {
                                 showZeroChipsOverlay = true
                             }
-                        }
+                        })
                         
                         NavigationLink(destination: SettingsView()) {
-                            MenuButton(title: "Settings", systemImage: "gear")
+                            Image("CTSettings")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .shadow(radius: 5)
+                                .background(Color.yellow.opacity(0.3))
                         }
                         
                         NavigationLink(destination: HowToPlayView()) {
-                            MenuButton(title: "How to Play", systemImage: "book.fill")
+                            Image("CTHowToPlay")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 280)
+                                .padding()
+                                .shadow(radius: 5)
+                                .background(Color.yellow.opacity(0.3))
                         }
                     }
                 }
@@ -85,21 +101,32 @@ struct MenuButton: View {
     let systemImage: String
     
     var body: some View {
-        HStack {
-            Image(systemName: systemImage)
-                .font(.title2)
-            Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
-        }
-        .foregroundColor(.white)
-        .frame(maxWidth: 280)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 15)
-                .fill(Color(hex: "38b802"))
+        // Force display custom assets
+        if title == "Start Counting" {
+            Image("CTStart")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 280)
+                .padding()
                 .shadow(radius: 5)
-        )
+                .background(Color.yellow.opacity(0.3)) // Debug background
+        } else if title == "Settings" {
+            Image("CTSettings")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 280)
+                .padding()
+                .shadow(radius: 5)
+                .background(Color.yellow.opacity(0.3)) // Debug background
+        } else if title == "How to Play" {
+            Image("CTHowToPlay")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 280)
+                .padding()
+                .shadow(radius: 5)
+                .background(Color.yellow.opacity(0.3)) // Debug background
+        }
     }
 }
 

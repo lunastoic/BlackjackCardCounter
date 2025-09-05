@@ -55,7 +55,7 @@ class BlackjackBettingManager: ObservableObject {
         // Add chips for the previous bet (subtract from total)
         var remaining = previousBet
         var newChips: [Int] = []
-        let playerChips = [1, 5, 10, 25, 50, 100]
+        let playerChips = [1, 5, /* 10, */ 25, 50, 100]
         
         for chip in playerChips.sorted(by: >) {
             while remaining >= chip {

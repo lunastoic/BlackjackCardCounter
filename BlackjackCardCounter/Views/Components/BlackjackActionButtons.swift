@@ -85,25 +85,56 @@ struct PremiumActionButton: View {
     let action: () -> Void
     var highlighted: Bool = false
     
+    @State private var isPressed: Bool = false
+    
     var body: some View {
-        Button(action: { if isEnabled { action() } }) {
-            HStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.fixedSystem(size: 16, weight: .semibold))
-                Text(title)
-                    .font(.fixedSystem(size: 14, weight: .semibold))
+        Button(action: { 
+            if isEnabled { 
+                // Add press animation
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = true
+                }
+                
+                // Execute the action
+                action()
+                
+                // Reset press state after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+            } 
+        }) {
+            // Custom asset button
+            Group {
+                if title == "Double Down" {
+                    Image("DDAssetButton")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 8)
+                } else if title == "Hit" {
+                    Image("HitAssetButton")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 8)
+                } else if title == "Stand" {
+                    Image("StandAssetButton")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 8)
+                } else if title == "Split" {
+                    Image("SplitAssetButton")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 8)
+                }
             }
-            .foregroundColor(isEnabled ? .white : .gray)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.vertical, 8)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(hex: color1), Color(hex: color2)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(14)
+            .scaleEffect(isPressed ? 0.95 : 1.0) // Press animation
             .shadow(color: highlighted ? .yellow : .clear, radius: 16)
             .shadow(color: Color.black.opacity(0.18), radius: 5, x: 0, y: 2)
         }

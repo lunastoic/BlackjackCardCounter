@@ -41,8 +41,8 @@ struct MapCarouselView: View {
                         .animation(.easeInOut(duration: 0.12), value: selectedIndex)
                 }
             }
-            .padding(.top, 20)
-            .padding(.bottom, 20)
+            .padding(.top, 10) // Reduced padding to give more space for map cards
+            .padding(.bottom, 10) // Reduced padding to give more space for map cards
         }
     }
 }

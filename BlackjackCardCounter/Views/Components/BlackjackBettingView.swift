@@ -100,7 +100,7 @@ struct ChipSelectionView: View {
     @ObservedObject var gameState: BlackjackGameState
     let bettingManager: BlackjackBettingManager
     
-    private let playerChips = [1, 5, 10, 25, 50, 100]
+    private let playerChips = [1, 5, /* 10, */ 25, 50, 100]
     
     var body: some View {
         HStack(spacing: 16) {
