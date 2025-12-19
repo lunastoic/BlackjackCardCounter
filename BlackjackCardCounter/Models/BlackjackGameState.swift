@@ -21,6 +21,7 @@ class BlackjackGameState: ObservableObject {
     @Published var lastPayout: Int = 0
     @Published var actualWinnings: Int = 0
     @Published var winningAmount: Int = 0
+    @Published var displayBetAmount: Int = 0 // For display purposes when betting state is cleared
     @Published var cardsDealt: Int = 0
     @Published var runningCount: Int = 0
     @Published var isTrainingMode: Bool = false
@@ -29,26 +30,57 @@ class BlackjackGameState: ObservableObject {
     // Betting state
     @Published var playerBet: Int = 0
     @Published var betChips: [Int] = []
+    @Published var additionalBetChips: [Int] = [] // Right-side stack for double down/split
+    @Published var doubleDownChipsHand2: [Int] = [] // Double down chips for Hand 2 (left)
+    @Published var doubleDownChipsHand1: [Int] = [] // Double down chips for Hand 1 (right)
+    @Published var savedLoseChips: [Int] = [] // Chips saved for lose animation
     @Published var lastBet: Int? = nil
     @Published var splitHandBets: [Int] = [] // Individual bet amounts for each split hand
+    @Published var doubledDownHandIndex: Int? = nil // Track which split hand was doubled down (0 or 1)
+    @Published var hideBetChipsDuringLoseAnimation: Bool = false // Hide bet chips during lose animation
+    
+    // Chip selection positions (from GeometryReader) - kept for potential future use
+    @Published var chipSelectionPositions: [Int: CGPoint] = [:] // Chip Value -> Position
+    
+    // Fixed positions for chip animation (like card deck position)
+    @Published var chipSelectionAreaPosition: CGPoint = .zero // Where chips are selected
+    @Published var bettingAreaPosition: CGPoint = .zero // Where chips are placed
     
     // Debug and overlay state
     @Published var showZeroChipsOverlay: Bool = false
     @Published var debugPayoutMessage: String? = nil
     @Published var showDebugPayout: Bool = false
+    @Published var showPlaceChipNotification: Bool = false
+    @Published var showPostGameButtons: Bool = false // Track when to show redo bet, deal cards, auto play buttons
+    @Published var showResultNotification: Bool = true // Track when to show win/lose notifications
+    @Published var userPlacedCurrentBet: Bool = false // True only when user explicitly placed/redo bet this round
+    @Published var autoCollectWinningsToggle: Bool = false // Triggers animation to collect winnings back to user
+    
+    // Deck shuffling state
+    @Published var showShufflingNotification: Bool = false // Show "shuffling deck after this round" notification
+    @Published var needsShuffling: Bool = false // Track if deck needs to be shuffled after current round
+    @Published var originalDeck: [Card] = [] // Store original deck for shuffling
     
     // Animation state for RegularModeView
     @Published var isDealing: Bool = false
     @Published var isProcessingAction: Bool = false
     @Published var lastActionTime: Date = Date()
     @Published var deckFrame: CGRect = .zero
-    @Published var deckPosition: CGPoint = .zero
+    @Published var deckPosition: CGPoint = .zero // Used for dealing cards (shoe position)
+    @Published var deckCollectionPosition: CGPoint = .zero // Used for collecting cards (deck position)
     @Published var animatingCards: [UUID: Card] = [:]
     @Published var animatingCardPositions: [UUID: CGPoint] = [:]
     @Published var animatingCardScales: [UUID: CGFloat] = [:]
     @Published var animatingCardOpacities: [UUID: Double] = [:]
     @Published var cardFlipRotations: [UUID: Double] = [:]
     @Published var cardFlipScales: [UUID: CGFloat] = [:]
+    
+    // Collection animation state
+    @Published var collectingCardIds: Set<UUID> = []
+    @Published var arrivalOrder: [UUID: Int] = [:]
+    @Published var isCollectingPhase: Bool = false
+    @Published var cardsJustCollected: Bool = false // Track when cards were just collected (for training mode button positioning)
+    @Published var hasEverDealtCards: Bool = false // Track if cards have ever been dealt (for stable button positioning)
     
     // Position tracking for animations
     @Published var playerCardPositions: [Int: CGPoint] = [:]
@@ -140,6 +172,7 @@ class BlackjackGameState: ObservableObject {
         splitHands = []
         activeHandIndex = 0
         isSplit = false
+        doubledDownHandIndex = nil
         isPlayerTurn = true
         showNextHand = false
         resultMessage = nil
@@ -151,8 +184,26 @@ class BlackjackGameState: ObservableObject {
         winningAmount = 0
         cardsDealt = 0
         runningCount = 0
-        playerBet = 0
-        betChips = []
+        // Only clear betting state if we're not in the middle of a card collection animation
+        if !isCollectingPhase {
+            playerBet = 0
+            betChips = []
+            additionalBetChips = [] // Clear additional bet chips
+            doubleDownChipsHand2 = [] // Clear double down chips for Hand 2
+            doubleDownChipsHand1 = [] // Clear double down chips for Hand 1
+            savedLoseChips = [] // Clear saved chips for lose animation
+            displayBetAmount = 0 // Clear display amount when starting new game
+            userPlacedCurrentBet = false
+            
+            // Clear chip selection positions
+            chipSelectionPositions.removeAll()
+            
+            // Clear fixed positions
+            chipSelectionAreaPosition = .zero
+            bettingAreaPosition = .zero
+        } else {
+            print("🎯 EndRound: Preserving betting state in resetGame during card collection")
+        }
         lastBet = nil
         isDealing = false
         isProcessingAction = false
@@ -165,6 +216,11 @@ class BlackjackGameState: ObservableObject {
         animatingCardOpacities.removeAll()
         cardFlipRotations.removeAll()
         cardFlipScales.removeAll()
+        collectingCardIds.removeAll()
+        arrivalOrder.removeAll()
+        isCollectingPhase = false
+        cardsJustCollected = false
+        hasEverDealtCards = false
         playerCardPositions.removeAll()
         dealerCardPositions.removeAll()
         cardDealPositions.removeAll()
@@ -174,6 +230,8 @@ class BlackjackGameState: ObservableObject {
         showZeroChipsOverlay = false
         debugPayoutMessage = nil
         showDebugPayout = false
+        showPlaceChipNotification = false
+        hideBetChipsDuringLoseAnimation = false
         flippedDealerCards.removeAll()
         countingRevealedDealerCards.removeAll()
         numberOfDecks = currentNumberOfDecks // Restore the deck count
@@ -206,7 +264,11 @@ class BlackjackGameState: ObservableObject {
         dealerCardPositions.removeAll()
         cardFlipRotations.removeAll()
         cardFlipScales.removeAll()
+        collectingCardIds.removeAll()
+        arrivalOrder.removeAll()
+        isCollectingPhase = false
         flippedDealerCards.removeAll()
         countingRevealedDealerCards.removeAll()
+        userPlacedCurrentBet = false
     }
 } 

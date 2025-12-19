@@ -36,7 +36,7 @@ struct SplitCardOverlay: UIViewRepresentable {
                     let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
                     
                     let cardView = UIImageView()
-                    cardView.image = UIImage(named: card.imageName)
+                    cardView.image = UIImage(named: card.imageName(isTrainingMode: false))
                     cardView.contentMode = .scaleAspectFit
                     cardView.frame = CGRect(
                         x: pos.x - cardSize.width/2,

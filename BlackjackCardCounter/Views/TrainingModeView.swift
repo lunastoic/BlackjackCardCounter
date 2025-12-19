@@ -19,7 +19,110 @@ struct TrainingModeView: View {
     @AppStorage("showCardCharts") private var showCardCharts: Bool = false
     @State private var selectedChart: Int = 0 // 0 = Dealt, 1 = Remaining
     
+    // Animation state (matching RegularModeView)
+    @Namespace private var mgCards
+    @State private var tableSize: CGSize = .zero
+    @State private var finalPlayerPositions: [UUID: CGPoint] = [:]
+    @State private var finalDealerPositions: [UUID: CGPoint] = [:]
+    @State private var finalSplitPositions: [[UUID: CGPoint]] = Array(repeating: [:], count: 2)
+    @State private var shoeFrame: CGRect = .zero
+    @State private var shoePosition: CGPoint = .zero
+    // Collect sequencing (now in gameState)
+    @State private var visiblePlayerCount: Int = 0
+    @State private var visibleDealerCount: Int = 0
+    @State private var dealerHoleRevealed: Bool = false
+    @State private var discardPile: [Card] = []
+    
+    // MARK: - Chip Position Helpers
+    private struct ChipPositions {
+        let hand2BetXOffset: CGFloat
+        let hand1BetXOffset: CGFloat
+        let hand2DDXOffset: CGFloat
+        let hand1DDXOffset: CGFloat
+    }
+
+    // MARK: - Chip Stack Rendering Helpers (reduce SwiftUI type-check complexity)
+    private let chipSize: CGFloat = 44.0
+    private let chipSpacing: CGFloat = 45.0 // chipSize (44) + 1
+    
+    private func chipOffsets(index: Int, horizontal: Bool) -> (x: CGFloat, y: CGFloat) {
+        if horizontal {
+            return (CGFloat(index) * chipSpacing, 0)
+        } else {
+            let angle = Double(index) * 0.8
+            let radius: CGFloat = 0.5
+            return (radius * CGFloat(cos(angle)), radius * CGFloat(sin(angle)))
+        }
+    }
+    
+    private func chipStackAnyView(chips: [Int], debugColors: [Color], horizontal: Bool) -> AnyView {
+        let sorted = chips.sorted(by: >)
+        return AnyView(
+            ZStack {
+                ForEach(Array(sorted.enumerated()), id: \.offset) { index, chipValue in
+                    let offs = chipOffsets(index: index, horizontal: horizontal)
+                    ZStack {
+                        Circle()
+                            .fill(debugColors[index % debugColors.count])
+                            .frame(width: chipSize, height: chipSize)
+                        ChipView(chip: Chip(value: chipValue))
+                    }
+                    .offset(x: offs.x, y: offs.y)
+                    .zIndex(20000 + Double(index))
+                    .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
+                    .animation(.none)
+                    .transition(.identity)
+                    .transaction { $0.animation = nil }
+                    .allowsHitTesting(false)
+                }
+            }
+            .frame(height: 60)
+        )
+    }
+    
+    private func computeChipPositions() -> ChipPositions {
+        // NOTE: Betting stacks should NOT shift based on win/loss.
+        // Only apply a small +7pt nudge while payout chips are being shown/animated.
+        let hand2Doubled = !gameState.doubleDownChipsHand2.isEmpty
+        let hand1Doubled = !gameState.doubleDownChipsHand1.isEmpty
+        let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
+        
+        // When payout chips are present (while payout chips are animating / placed),
+        // shift BOTH stacks per hand slightly right to make room on the left.
+        // Tuned so the 2 payout chips per hand fit cleanly on the left.
+        let payoutOffset: CGFloat = hasPayoutChips ? 36.0 : 0.0
+        // Extra spacing between the two 4-chip groups (Figma mock):
+        // push Hand 2 group slightly left, Hand 1 group slightly right.
+        let hand2GroupTweak: CGFloat = hasPayoutChips ? -1.0 : 0.0
+        let hand1GroupTweak: CGFloat = hasPayoutChips ? 7.0 : 0.0
+        
+        // Hand 2 bet chips: Fixed position (no win/loss shift), plus payout nudge
+        let hand2BetXOffset: CGFloat = gameState.isSplit ? 
+            (-70.0 + payoutOffset + hand2GroupTweak) : 0.0
+        
+        let hand1BetXOffset: CGFloat = gameState.isSplit ? 
+            (70.0 + (hand1Doubled ? 10.0 : 0.0) + payoutOffset + hand1GroupTweak) : 60.0
+        
+        // Hand 2 double down chips: Position to the LEFT of bet chips (44 points to the left, touching)
+        // Bet chips are at -70.0, so DD chips at -70.0 - 44.0 = -114.0
+        // Also offset right when payout chips present
+        let hand2DDXOffset: CGFloat = gameState.isSplit ? 
+            (hand2Doubled ? (-114.0 + payoutOffset + hand2GroupTweak) : (-110.0 + payoutOffset + hand2GroupTweak)) : 0.0
+        
+        // Hand 1 double down chips: Also offset right when payout chips present
+        let hand1DDXOffset: CGFloat = gameState.isSplit ? 
+            (hand1Doubled ? (80.0 + 45.0 + payoutOffset + hand1GroupTweak) : (30.0 + payoutOffset + hand1GroupTweak)) : 120.0
+        
+        return ChipPositions(
+            hand2BetXOffset: hand2BetXOffset,
+            hand1BetXOffset: hand1BetXOffset,
+            hand2DDXOffset: hand2DDXOffset,
+            hand1DDXOffset: hand1DDXOffset
+        )
+    }
+    
     var body: some View {
+        GeometryReader { tableGeo in
         ZStack {
             // Background image - ensure it covers the entire screen
             Image("GreenSuede")
@@ -28,39 +131,100 @@ struct TrainingModeView: View {
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
             .ignoresSafeArea(.all, edges: .all)
             
+            // Shoe and Deck assets - EXACT COPY FROM REGULAR MODE (behind everything)
+            VStack {
+                Spacer().frame(height: 100) // Position at top like regular mode
+                
+                HStack {
+                    // Left side: Deck
+                    VStack {
+                        Image("DeckCover")
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: 48, height: 72)
+                            .shadow(radius: 4)
+                            .offset(x: -5, y: 25) // Shift deck cover 5 points to the left and 25 points down
+                        Text("Deck")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                            .offset(x: -5, y: 25) // Shift "Deck" text 5 points to the left and 25 points down
+                    }
+                    
+                    Spacer()
+                    
+                    // Right side: Shoe
+                    VStack {
+                        Image("DeckCover")
+                            .resizable()
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .frame(width: 48, height: 72)
+                            .shadow(radius: 4)
+                            .offset(y: 25) // Shift shoe 25 points down
+                            .overlay(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .onAppear {
+                                            let f = geometry.frame(in: .named("table"))
+                                            shoeFrame = f
+                                            shoePosition = CGPoint(x: f.midX, y: f.midY)
+                                            gameState.deckFrame = f
+                                            gameState.deckPosition = shoePosition // dealing origin
+                                        }
+                                        .onChange(of: geometry.frame(in: .named("table"))) { newF in
+                                            shoeFrame = newF
+                                            shoePosition = CGPoint(x: newF.midX, y: newF.midY)
+                                            gameState.deckFrame = newF
+                                            gameState.deckPosition = shoePosition
+                                        }
+                                }
+                            )
+                        Text("Shoe")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                            .offset(y: 25) // Shift "Shoe" text 25 points down
+                    }
+                }
+                .padding(.horizontal, 32)
+                
+            Spacer() // Push to top
+        }
+        .offset(y: -57) // Shift deck and shoe assets up by 57 points
+        .zIndex(1) // Above background but below card counter meter
+            
             // Background text - arched like a rainbow (behind everything)
             GeometryReader { geo in
                 ZStack {
-                    // "Luna Luxe Casino" - top arc
+                    // "Luna Luxe Casino" - top arc (matching RegularModeView)
                     createArchedText(
                         text: "Luna Luxe Casino",
                         fontSize: 36,
                         width: geo.size.width * 0.8,
                         height: 80,
                         centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 125
+                        centerY: geo.size.height / 2 - 175
                     )
                     
-                    // "Blackjack pays 3 to 2" - middle arc
+                    // "Blackjack pays 3 to 2" - middle arc (matching RegularModeView)
                     createArchedText(
                         text: "Blackjack pays 3 to 2",
                         fontSize: 24,
                         width: geo.size.width * 0.7,
                         height: 60,
                         centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 95
+                        centerY: geo.size.height / 2 - 145
                     )
                     
-                    // "Dealer must hit on soft 17" - bottom arc
+                    // "Dealer must hit on soft 17" - bottom arc (matching RegularModeView)
                     createArchedText(
                         text: "Dealer must hit on soft 17",
                         fontSize: 16,
                         width: geo.size.width * 0.75,
                         height: 50,
                         centerX: geo.size.width / 2,
-                        centerY: geo.size.height / 2 - 65
+                        centerY: geo.size.height / 2 - 115
                     )
                 }
+                .offset(y: -11) // Shift all background text up by 11 points
                 .allowsHitTesting(false)
             }
             .zIndex(0)
@@ -69,7 +233,6 @@ struct TrainingModeView: View {
                 // Game Header
                 ZStack(alignment: .topTrailing) {
                     GameHeaderView()
-                        .padding(.top, 50)
                     
                     if gameState.showDebugPayout, let msg = gameState.debugPayoutMessage {
                         Text(msg)
@@ -99,7 +262,7 @@ struct TrainingModeView: View {
                 
                 // Visualizers at the top
                 VStack(spacing: 8) {
-                    CardCountMeter(runningCount: gameState.runningCount)
+                    CardCounterMeterTM(gameState: gameState)
                     
                     if showCardCharts {
                         VStack(spacing: 4) {
@@ -154,17 +317,25 @@ struct TrainingModeView: View {
                     Spacer().frame(height: 15)
                 }
                 
-                // Player and Dealer cards area
+                // Player and Dealer cards area (offset to match RegularModeView positioning)
                 GeometryReader { geo in
                     let maxPlayerCards = max(gameState.dealtPlayerCards.count, gameState.isSplit ? gameState.splitHands.flatMap { $0 }.count : 2)
                     let maxDealerCards = max(gameState.dealtDealerCards.count, 2)
                     let maxCards = max(maxPlayerCards, maxDealerCards)
-                    let cardWidth = min(60, (geo.size.width - CGFloat(maxCards - 1) * 8) / CGFloat(maxCards))
+                    let cardWidth: CGFloat = 60 // Fixed card width to prevent layout shifts
+                    
+                    // Update table size when geometry changes
+                    let _ = DispatchQueue.main.async {
+                        if tableSize != geo.size {
+                            tableSize = geo.size
+                        }
+                    }
+                    
                     
                     VStack(spacing: 0) {
                         // Dealer cards
                         VStack(spacing: 8) {
-                            HStack {
+                            VStack(spacing: 4) {
                                 Text("Dealer")
                                     .font(.headline)
                                     .foregroundColor(.white)
@@ -173,291 +344,151 @@ struct TrainingModeView: View {
                                     .foregroundColor(.yellow)
                             }
                             
+                            // Hidden placeholders to keep layout stable (like RegularModeView)
                             HStack(spacing: 8) {
-                                ForEach(gameState.dealtDealerCards.indices, id: \.self) { idx in
-                                    let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-                                    FlipCardView(
-                                        card: gameState.dealtDealerCards[idx],
+                                ForEach(Array(gameState.dealtDealerCards.enumerated()), id: \.offset) { idx, card in
+                                TrainingModeFlipCardView(card: card,
                                         isFlipped: gameState.flippedDealerCards.contains(idx),
-                                        width: cardWidth,
-                                        glowWidth: cardWidth + 10
-                                    )
-                                    .layoutPriority(1)
-                                    .transition(.move(edge: .top).combined(with: .opacity))
+                                            width: CardMetrics.cardSize.width, glowWidth: 8)
+                                        .opacity(0.0)
+                                        .transaction { $0.animation = nil }
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .center)
                         }
-                        .offset(y: UIDevice.current.userInterfaceIdiom == .phone ? -15 : 0)
                         
-                        // Spacing between dealer and player - 5 points more on iPhone
-                        Spacer().frame(height: UIDevice.current.userInterfaceIdiom == .phone ? 13 : 8)
+                        // Fixed spacing between dealer and player (like RegularModeView)
+                        Spacer().frame(height: 32)
                         
-                        // Player cards
+                        // Player - PLACEHOLDER (real Player title moved to isolated ZStack layer)
                         VStack(spacing: 8) {
-                            HStack {
-                                Text("Player")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                Text(gameState.isSplit ? gameEngine.getHandValueText(gameState.splitHands[gameState.activeHandIndex]) : gameEngine.getHandValueText(gameState.playerHand))
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.yellow)
-                            }
+                            // Placeholder for Player title - will be drawn in isolated layer
+                            Color.clear.frame(height: 20)
                             
                             if gameState.isSplit {
+                                    // Split labels + hidden placeholders only (real cards are drawn in overlay)
+                                    VStack(spacing: 4) {
+                                        // Placeholder for split yellow number - will be drawn in isolated layer
+                                        Color.clear.frame(height: 20)
+
                                 HStack(spacing: 24) {
                                     ForEach(gameState.splitHands.indices, id: \.self) { idx in
                                         VStack {
                                             HStack {
-                                                Text("Hand \(idx == 1 ? 1 : 2)\(gameState.activeHandIndex == idx ? " (Active)" : "")")
-                                                    .font(.caption)
-                                                    .foregroundColor(gameState.activeHandIndex == idx ? .yellow : .gray)
-                                                Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
-                                                    .font(.caption)
+                                                        Text("Hand \(idx == 1 ? 1 : 2)\(isHandActive(idx) ? " (Active)" : "")")
+                                                            .font(.headline).foregroundColor(isHandActive(idx) ? .yellow : .gray)
+                                                            .offset(y: -22) // Shift up by 22 points away from cards
+                                                        Text(gameEngine.getHandValueText(gameState.splitHands[idx]))
+                                                            .font(.system(size: 17, weight: .bold))
                                                     .foregroundColor(.yellow)
+                                                            .offset(y: -22) // Shift up by 22 points away from cards
                                             }
                                             
-                                            HStack(spacing: 8) {
-                                                ForEach(gameState.splitHands[idx]) { card in
-                                                    CardView(card: card, width: cardWidth, glowWidth: cardWidth + 10)
-                                                        .layoutPriority(1)
-                                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                                    // Fixed-width placeholder (prevents layout shifts)
+                                                    let handCards = gameState.splitHands[idx]
+                                                    
+                                                    // Ask the layout for the hand's framed width (already constrained)
+                                                    let frame = SplitCardLayout.shared.getSplitHandFrame(
+                                                        handIndex: idx,
+                                                        cardCount: handCards.count,
+                                                        cardSize: CardMetrics.cardSize,
+                                                        tableSize: tableSize
+                                                    )
+                                                    
+                                                    // Reserve only this space; no invisible cards that expand with count
+                                                    Color.clear
+                                                        .frame(width: frame.width, height: frame.height)
                                                 }
-                                            }
-                                            .frame(maxWidth: .infinity, alignment: .center)
                                         }
                                     }
                                 }
                             } else {
+                                    // Placeholder for non-split yellow number - will be drawn in isolated layer
+                                    Color.clear.frame(height: 20)
+
+                                // Hidden placeholders for non-split player - ALWAYS reserve space
                                 HStack(spacing: 8) {
-                                    ForEach(gameState.dealtPlayerCards) { card in
-                                        CardView(card: card, width: cardWidth, glowWidth: cardWidth + 10)
-                                            .layoutPriority(1)
-                                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                                    // Always show 2 placeholder cards to reserve space
+                                        ForEach(0..<2, id: \.self) { _ in
+                                            Color.clear
+                                                .frame(width: CardMetrics.cardSize.width, height: CardMetrics.cardSize.height)
+                                        }
                                     }
+                                    .frame(minWidth: 200, minHeight: 90)
+                                    .frame(maxWidth: .infinity)
                                 }
-                                .frame(maxWidth: .infinity, alignment: .center)
                             }
-                        }
-                        .frame(height: 240)
+                            .frame(height: 140)
+                        // Removed conditional offset that was causing betting area to move during card dealing
                         
-                        // iPad-specific spacing above action buttons
+                        // Fixed spacing after player section (exactly like RegularModeView)
+                        Spacer().frame(height: 32)
+                        
+                        // iPad-specific spacing above action buttons (like RegularModeView)
                         if UIDevice.current.userInterfaceIdiom == .pad {
-                            Spacer().frame(height: 250)
+                            Spacer().frame(height: CardMetrics.extraSpacerHeight(isIPad: true))
                         }
                         
                         // Get training mode status
                         let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                         
-                        // Show betting areas only if training mode is disabled
-                        if !trainingModeEnabled {
-                        // Betting area
-                        BlackjackBettingView(
-                            gameState: gameState,
-                            bettingManager: bettingManager,
-                            gameEngine: gameEngine
-                        )
-                        .disabled(gameState.isDealing)
+                        // Shuffling notification is now handled as overlay - removed from here
                         
-                        // Chips at the bottom (always visible before a hand is dealt or after a round is over)
-                        if !gameState.showNextHand {
-                            ChipSelectionView(
-                                gameState: gameState,
-                                bettingManager: bettingManager
-                            )
-                            .disabled(gameState.isDealing)
-                            }
-                        }
+                        // Removed extra spacers that Regular Mode doesn't have:
+                        // - Removed Spacer().frame(height: 24)
+                        // - Removed duplicate Spacer().frame(height: 32)
+                        // Now matches Regular Mode spacing exactly
                         
-                        Spacer().frame(height: 24)
+                        // Removed betting area from main VStack - now positioned as separate overlay
                         
-                        // Show result message after round
-                        // Show action buttons only if training mode is disabled
+                        // Removed action buttons from main VStack to prevent betting area from being pushed down
                         
-                        if gameState.showNextHand && gameState.isPlayerTurn && !trainingModeEnabled {
-                            // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                            let activeHasBlackjack = gameState.isSplit && 
-                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
-                            
-                            let playerBusted = gameState.isSplit ? 
-                                gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
-                                gameEngine.isBust(gameState.playerHand)
-                            
-                            if !activeHasBlackjack && !playerBusted {
-                            BlackjackActionButtons(
-                                gameState: gameState,
-                                gameEngine: gameEngine,
-                                showStrategyHints: showStrategyHints,
-                                getPerfectStrategyAction: {
-                                    strategyHelper.getPerfectStrategyAction(
-                                        playerHand: gameState.playerHand,
-                                        dealerHand: gameState.dealerHand
-                                    )
-                                }
-                            )
-                            }
-                        }
+                        // Removed Deal Cards button from main VStack - now positioned as overlay under chip selection
                         
-                        // Deal/Next Hand Button at the very bottom (show in both training and regular mode, but hide during auto play)
-                        if !isContinuousAutoPlay && (gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) {
-                            VStack(spacing: 12) {
-                            DealNextHandButtons(
-                                gameState: gameState,
-                                gameEngine: gameEngine,
-                                bettingManager: bettingManager
-                            )
-                                
-                                // Auto Play button (always visible in training mode, but hide during auto play)
-                                Button(action: {
-                                    // Start auto play mode (same as training mode enabled)
-                                    UserDefaults.standard.set(true, forKey: "trainingModeEnabled")
-                                    startContinuousAutoPlay()
-                                }) {
-                                    ZStack {
-                                        // Custom asset background
-                                        Image("AutoPlayButton1")
-                                            .renderingMode(.original)
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 250, height: 48)
-                                        
-                                        // Text overlay
-                                        Text("Auto Play")
-                                            .font(.fixedSystem(size: 20, weight: .bold))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                        
-                        // Auto-deal in training mode
-                        if trainingModeEnabled {
-                            if !isContinuousAutoPlay && (gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) {
-                                Button(action: {
-                                    // Start continuous auto-play
-                                    startContinuousAutoPlay()
-                                }) {
-                                    Text("Start Training Hand")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 12)
-                                        .background(Color.blue)
-                                        .cornerRadius(12)
-                                }
-                            }
-                            
-                            // Stop button during continuous auto-play
-                            if isContinuousAutoPlay {
-                                VStack(spacing: 16) {
-                                    Button(action: {
-                                        stopButtonPressed = true
-                                        stopContinuousAutoPlay()
-                                    }) {
-                                        Text("Stop")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 32)
-                                            .padding(.vertical, 12)
-                                            .background(stopButtonPressed ? Color.gray : Color(hex: "ff0000")) // Gray when pressed, red when normal
-                                            .cornerRadius(12)
-                                    }
-                                    
-                                    // Speed control wheel
-                                    VStack(spacing: 8) {
-                                        Text("Speed")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white)
-                                        
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "tortoise.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                            
-                                            Slider(
-                                                value: sliderSpeedBinding,
-                                                in: 0.3...3.0,
-                                                step: 0.1,
-                                                onEditingChanged: { editing in
-                                                    isDraggingSpeed = editing
-                                                    if editing {
-                                                        print("🎮 Speed slider: Started dragging")
-                                                    } else {
-                                                        // Commit the speed change on release
-                                                        autoPlaySpeed = 3.3 - tempSliderSpeed
-                                                        print("🎮 Speed slider: Released, new speed = \(autoPlaySpeed)")
-                                                    }
-                                                }
-                                            )
-                                            .frame(width: 120)
-                                            .accentColor(.yellow)
-                                            
-                                            Image(systemName: "hare.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.yellow)
-                                        }
-                                        
-                                        Text(speedLabel(isDraggingSpeed ? (3.3 - tempSliderSpeed) : autoPlaySpeed))
-                                            .font(.caption)
-                                            .foregroundColor(isDraggingSpeed ? .orange : .yellow)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Color.black.opacity(0.7))
-                                    .cornerRadius(12)
-                                }
-                            }
-                        }
-                    }
+            }
+            .overlay(
+                // Shuffling notification overlay - doesn't affect layout
+                ShufflingNotification(gameState: gameState)
+                    .zIndex(1000) // High z-index to appear on top
+            )
                 }
                 .onAppear {
                     gameEngine.resetDeck(gameState: gameState, numberOfDecks: numberOfDecks)
+                    // Ensure all cards are visible in training mode
+                    visiblePlayerCount = gameState.playerHand.count
+                    visibleDealerCount = gameState.dealerHand.count
                 }
                 .onChange(of: gameState.playerHand.count) { handCount in
-                    // Auto-play logic for training mode when hand count changes
-                    let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-                    print("🎓 Training Mode: 📈 HAND COUNT CHANGED to \(handCount)")
-                    print("🎓 Training Mode: isPlayerTurn=\(gameState.isPlayerTurn), isDealing=\(gameState.isDealing), trainingEnabled=\(trainingModeEnabled)")
-                    print("🎓 Training Mode: isContinuousAutoPlay=\(isContinuousAutoPlay)")
+                    // Recalculate player card positions when hand count changes (like regular mode)
+                    CardPositioning.recalculateAllCardPositions(
+                        isPlayerCard: true,
+                        newCount: handCount,
+                        tableSize: tableSize,
+                        dealtPlayerCards: gameState.dealtPlayerCards,
+                        dealtDealerCards: gameState.dealtDealerCards,
+                        finalPlayerPositions: &finalPlayerPositions,
+                        finalDealerPositions: &finalDealerPositions
+                    )
                     
+                    // In training mode, keep visible count static to prevent layout shifts
+                    // visiblePlayerCount is set once on appear and stays static
+                    let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+                    
+                    // Auto-play logic for training mode when hand count changes
                     if trainingModeEnabled && gameState.isPlayerTurn && handCount >= 2 {
-                        let currentValue = gameEngine.handValue(gameState.playerHand)
-                        print("🎓 Training Mode: ✅ TRIGGERING waitForProcessingToComplete() - current value: \(currentValue)")
-                        if currentValue == 21 {
-                            print("🎓 Training Mode: 🎯 DETECTED 21 WITH \(handCount) CARDS!")
-                        } else if currentValue < 17 {
-                            print("🎓 Training Mode: 🎯 DETECTED \(currentValue) - NEED TO CONTINUE HITTING")
-                        } else if currentValue >= 17 && currentValue <= 21 {
-                            print("🎓 Training Mode: 🎯 DETECTED \(currentValue) - SHOULD STAND")
-                        }
                         // Wait for processing to complete, then check auto-play
                         waitForProcessingToComplete()
-                    } else {
-                        print("🎓 Training Mode: ❌ NOT TRIGGERING auto-play check:")
-                        print("  - trainingEnabled: \(trainingModeEnabled)")
-                        print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-                        print("  - handCount >= 2: \(handCount >= 2)")
                     }
                 }
                 .onChange(of: gameState.isPlayerTurn) { isPlayerTurn in
                     // Auto-play logic for training mode when player turn starts
                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-                    print("🎓 Training Mode: Player turn changed to \(isPlayerTurn), handCount=\(gameState.playerHand.count), isDealing=\(gameState.isDealing), trainingEnabled=\(trainingModeEnabled)")
                     
                     if trainingModeEnabled && !isPlayerTurn {
-                        print("🎓 Training Mode: 🔄 PLAYER TURN ENDED - DEALER SHOULD PLAY NOW...")
-                        print("🎓 Training Mode: Dealer hand count: \(gameState.dealerHand.count)")
-                        print("🎓 Training Mode: Flipped dealer cards: \(gameState.flippedDealerCards)")
-                        print("🎓 Training Mode: Visual revealed dealer: \(gameState.visuallyRevealedDealerHand.count)")
-                        print("🎓 Training Mode: Result message: \(gameState.resultMessage ?? "nil")")
-                        print("🎓 Training Mode: Is dealing: \(gameState.isDealing)")
-                        
                         // If dealer hasn't started playing after a delay, something is wrong
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             if gameState.flippedDealerCards.count <= 1 && gameState.resultMessage == nil {
-                                print("🎓 Training Mode: ⚠️ WARNING: Dealer hasn't started playing after 2 seconds!")
-                                print("🎓 Training Mode: Current state - isPlayerTurn=\(gameState.isPlayerTurn), isDealing=\(gameState.isDealing)")
+                                // Dealer hasn't started playing after 2 seconds
                             }
                         }
                     }
@@ -477,7 +508,7 @@ struct TrainingModeView: View {
                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                     
                     if trainingModeEnabled && isContinuousAutoPlay && resultMessage != nil {
-                        let delay = safeDelay(3.0)
+                        let delay = safeDelay(1.5) // Reduced from 3.0 to 1.5 seconds
                         print("🎓 Hand finished with result: \(resultMessage ?? "nil"), starting next hand in \(delay) seconds...")
                         
                         // Wait a bit to see the result, then clear and deal next hand (speed adjusted with safe minimums)
@@ -542,7 +573,7 @@ struct TrainingModeView: View {
             VStack {
                 HStack {
                     Button(action: { showStrategyChart = true }) {
-                        Image(systemName: "tablecells")
+                        Image(systemName: "lightbulb.fill")
                             .font(.fixedSystem(size: 28, weight: .regular))
                             .foregroundColor(.yellow)
                             .padding()
@@ -551,7 +582,7 @@ struct TrainingModeView: View {
                             .shadow(radius: 6)
                     }
                     .padding(.leading, 8)
-                    .offset(y: -30)
+                    .offset(y: -230)
                     
                     Spacer()
                     
@@ -563,18 +594,502 @@ struct TrainingModeView: View {
                             .shadow(radius: 6)
                     }
                     .padding(.trailing, 8)
-                    .offset(y: -207)
+                    .offset(y: -240)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .center)
             .offset(y: -30)
             
-            // Strategy chart overlay
-            if showStrategyChart {
-                StrategyChartOverlay(showStrategyChart: $showStrategyChart)
+        }
+        .overlay {
+            // ISOLATED PLAYER TITLE LAYER - Completely separate from GeometryReader
+            ZStack {
+                // Player title - completely isolated from card animations
+                Text("Player")
+                    .font(.fixedSystem(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+                    .position(
+                        x: UIScreen.main.bounds.width / 2, 
+                        y: gameState.dealtPlayerCards.isEmpty && gameState.dealtDealerCards.isEmpty ? 360 : 360
+                    )
+                    .offset(y: -10) // Shift up by 10 points total (5 + 5)
+                    .animation(.none) // No animations
+                    .zIndex(10000) // Highest z-index
+                
+                // Yellow number - completely isolated from card animations (only show for non-split hands)
+                if !gameState.isSplit {
+                    Text(playerValueLabel())
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.yellow)
+                        .offset(y: -6)
+                        .position(
+                            x: UIScreen.main.bounds.width / 2, 
+                            y: gameState.dealtPlayerCards.isEmpty && gameState.dealtDealerCards.isEmpty ? 390 : 390
+                        )
+                        .offset(y: -10) // Shift up by 10 points total (5 + 5)
+                        .animation(.none) // No animations
+                        .zIndex(10000) // Highest z-index
+                }
+            }
+            .allowsHitTesting(false) // Don't interfere with touch events
+        }
+        .overlay {
+            if gameState.showZeroChipsOverlay {
+                ZeroChipsOverlay(isPresented: $gameState.showZeroChipsOverlay)
             }
             
-            // Settings Modal Overlay
+            
+            // Define trainingModeEnabled at the top of overlay scope
+            let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+            
+            
+            
+            // ---- Completely Independent Training Mode Buttons ----
+                        if trainingModeEnabled {
+                if !isContinuousAutoPlay && !gameState.isDealing && (gameState.resultMessage != nil || !gameState.showNextHand) {
+                                Button(action: {
+                                    // Start continuous auto-play
+                                    startContinuousAutoPlay()
+                                }) {
+                                    Text("Start Training Hand")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(Color.blue)
+                                        .cornerRadius(12)
+                                }
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    // Removed absolute positioning - now uses natural VStack flow
+                    .zIndex(24) // Below betting area but above action buttons
+                    .allowsHitTesting(true)
+                    .background(Color.clear)
+                    .clipped()
+                            }
+                            
+                            // Stop button during continuous auto-play
+                            if isContinuousAutoPlay {
+                                VStack(spacing: 16) {
+                                    Button(action: {
+                                        stopButtonPressed = true
+                                        stopContinuousAutoPlay()
+                                    }) {
+                                        Text("Stop")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 32)
+                                            .padding(.vertical, 12)
+                                .background(stopButtonPressed ? Color.gray : Color(hex: "ff0000"))
+                                            .cornerRadius(12)
+                                    }
+                                    
+                                    // Speed control wheel
+                                    VStack(spacing: 8) {
+                                        Text("Speed")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white)
+                                        
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "tortoise.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                            
+                                            Slider(
+                                                value: sliderSpeedBinding,
+                                                in: 0.3...3.0,
+                                                step: 0.1,
+                                                onEditingChanged: { editing in
+                                                    isDraggingSpeed = editing
+                                                    if editing {
+                                                        print("🎮 Speed slider: Started dragging")
+                                                    } else {
+                                                        // Commit the speed change on release
+                                                        autoPlaySpeed = 3.3 - tempSliderSpeed
+                                                        print("🎮 Speed slider: Released, new speed = \(autoPlaySpeed)")
+                                                    }
+                                                }
+                                            )
+                                            .frame(width: 120)
+                                            .accentColor(.yellow)
+                                            
+                                            Image(systemName: "hare.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.yellow)
+                                        }
+                                        
+                                        Text(speedLabel(isDraggingSpeed ? (3.3 - tempSliderSpeed) : autoPlaySpeed))
+                                            .font(.caption)
+                                            .foregroundColor(isDraggingSpeed ? .orange : .yellow)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(12)
+                                }
+                    // Removed absolute positioning - now uses natural VStack flow
+                    .zIndex(24) // Below betting area but above action buttons
+                    .allowsHitTesting(true)
+                    .background(Color.clear)
+                    .clipped()
+                    .offset(y: 100) // Push down to avoid overlapping with user cards
+                }
+            }
+            
+            
+            // ---- Action Buttons Overlay (ABSOLUTE POSITION) ----
+            if gameState.isPlayerTurn && gameState.playerHand.count >= 2 && !isContinuousAutoPlay {
+                // Check if current active hand has blackjack or is busted (don't show buttons if so)
+                let activeHasBlackjack = gameState.isSplit && 
+                    gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                
+                let playerBusted = gameState.isSplit ? 
+                    gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
+                    gameEngine.isBust(gameState.playerHand)
+                
+                if !activeHasBlackjack && !playerBusted {
+                    BlackjackActionButtons(
+                        gameState: gameState,
+                        gameEngine: gameEngine,
+                        showStrategyHints: showStrategyHints,
+                        getPerfectStrategyAction: {
+                            strategyHelper.getPerfectStrategyAction(
+                                playerHand: gameState.activeHand,
+                                dealerHand: gameState.dealerHand
+                            )
+                        }
+                    )
+                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.75)
+                    .zIndex(998) // Below betting area
+                }
+            }
+            
+            // ---- Deal Cards Button Overlay (ABSOLUTE POSITION) ----
+            if (gameState.lastBet != nil || gameState.resultMessage != nil
+                || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) 
+                && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
+                && !gameState.isDealing && !isContinuousAutoPlay {
+
+                VStack(spacing: 16) {
+                    DealNextHandButtons(
+                        gameState: gameState,
+                        gameEngine: gameEngine,
+                        bettingManager: bettingManager,
+                        animationCallback: { card, index, completion in
+                            // index: 0=P1, 1=D1 (hole), 2=P2, 3=D2 (up)
+                            if index == 0 {
+                                visiblePlayerCount = 0
+                                visibleDealerCount = 0
+                                dealerHoleRevealed = false
+                                finalPlayerPositions.removeAll()
+                                finalDealerPositions.removeAll()
+                                finalSplitPositions = Array(repeating: [:], count: 2)
+                            }
+
+                            let isPlayer = (index == 0 || index == 2)
+                            let slotIndex: Int = isPlayer ? (index == 0 ? 0 : 1) : (index == 1 ? 0 : 1)
+
+                            let midX = tableSize.width * 0.5
+                            let startX = midX - (CardMetrics.cardSpacing / 2)
+                            let x = startX + CGFloat(slotIndex) * CardMetrics.cardSpacing
+                            let y = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                            let destination = CGPoint(x: x, y: y)
+
+                            if isPlayer { finalPlayerPositions[card.id] = destination }
+                            else { finalDealerPositions[card.id] = destination }
+
+                            let shouldFlip = (index != 1)
+                            CardAnimator.animateDeal(
+                                card: card,
+                                to: destination,
+                                shouldFlip: shouldFlip,
+                                deckPosition: gameState.deckPosition,
+                                gameState: gameState
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.001)) { completion() }
+                                CardAnimator.cleanupAnimatedCard(
+                                    card.id,
+                                    gameState: gameState
+                                )
+                                if isPlayer { 
+                                    visiblePlayerCount += 1 
+                                } else { 
+                                    visibleDealerCount += 1 
+                                }
+                            }
+                        }
+                    )
+                }
+                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.8)
+                .zIndex(997) // Below action buttons
+            }
+            
+            // ---- Animated and Static Cards Overlay ----
+            TrainingModeAnimatedCardsOverlay(
+                animatingCards: gameState.animatingCards,
+                animatingCardPositions: gameState.animatingCardPositions,
+                cardFlipRotations: gameState.cardFlipRotations,
+                arrivalOrder: gameState.arrivalOrder,
+                collectingCardIds: gameState.collectingCardIds,
+                isCollectingPhase: gameState.isCollectingPhase,
+                dealtPlayerCards: gameState.dealtPlayerCards,
+                dealtDealerCards: gameState.dealtDealerCards,
+                flippedDealerCards: gameState.flippedDealerCards,
+                finalPlayerPositions: finalPlayerPositions,
+                finalDealerPositions: finalDealerPositions,
+                tableSize: tableSize,
+                mgCards: mgCards,
+                isSplit: gameState.isSplit
+            )
+            .offset(y: gameState.isSplit ? 17 : 27) // Move up 10 points when split (27 - 10 = 17), otherwise 27 points down
+            .allowsHitTesting(false)
+            
+            // Split cards overlay (copied from RegularModeView)
+            if gameState.isSplit {
+                ZStack {
+                    // Static split cards
+                    ForEach(gameState.splitHands.indices, id: \.self) { handIdx in
+                        ForEach(Array(gameState.splitHands[handIdx].enumerated()), id: \.offset) { cIdx, card in
+                            if !gameState.animatingCards.keys.contains(card.id) {
+                                let pos = finalSplitPositions[handIdx][card.id] ?? CardPositioning.splitStaticPosition(handIndex: handIdx, cardIndex: cIdx, totalCards: gameState.splitHands[handIdx].count, tableSize: tableSize)
+                                let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
+                                TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8)
+                                    .matchedGeometryEffect(id: card.id, in: mgCards)
+                                    .position(pos)
+                                    .zIndex(zIndex)
+                                    .opacity(gameState.collectingCardIds.contains(card.id) ? 0 : 1)
+                                    .allowsHitTesting(false)
+                                    .transition(.identity)
+                            }
+                        }
+                    }
+                    
+                    // Animated split cards (in the same overlay)
+                    ForEach(Array(gameState.animatingCards.keys), id: \.self) { cardId in
+                        if let card = gameState.animatingCards[cardId],
+                           let pos = gameState.animatingCardPositions[cardId] {
+                            
+                            let core = ZStack {
+                                Image(card.imageName(isTrainingMode: true))
+                                    .resizable()
+                                    .aspectRatio(0.7, contentMode: .fit)
+                                    .frame(width: CardMetrics.cardSize.width, height: CardMetrics.cardSize.height)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .shadow(radius: 3)
+                                    .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
+                                    .rotation3DEffect(
+                                        .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
+                                        axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                    )
+
+                                Image("DeckCover")
+                                    .resizable()
+                                    .aspectRatio(0.7, contentMode: .fit)
+                                    .frame(width: CardMetrics.cardSize.width, height: CardMetrics.cardSize.height)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .shadow(radius: 3)
+                                    .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 0 ? 0 : 1)
+                                    .rotation3DEffect(
+                                        .degrees(gameState.cardFlipRotations[cardId] ?? 0),
+                                        axis: (x: 0, y: 1, z: 0), perspective: 0.6
+                                    )
+                                    .allowsHitTesting(false)
+                                    .zIndex(-1)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .allowsHitTesting(false)
+
+                            Group {
+                                if gameState.isCollectingPhase { core.position(pos) }
+                                else { core.matchedGeometryEffect(id: card.id, in: mgCards).position(pos) }
+                            }
+                            .allowsHitTesting(false)
+                            .zIndex(1000 + Double(gameState.arrivalOrder[cardId] ?? 0)) // Higher z-index for animated cards
+                        }
+                    }
+                }
+                .offset(y: 17) // Move up 10 points when split (27 - 10 = 17)
+                .allowsHitTesting(false)
+            }
+            
+            // Place Chip Notification - positioned at the very top layer
+            PlaceChipNotification(isVisible: $gameState.showPlaceChipNotification)
+            
+            // Chip Win/Lose Animation - Clean and simple animation system
+            ChipWinLoseAnimation(gameState: gameState)
+                .zIndex(99999) // Highest z-index to ensure visibility
+            
+            // Strategy chart overlay - positioned at the absolute top layer
+            if showStrategyChart {
+                BlackjackStratChartTM(showStrategyChart: $showStrategyChart)
+                    .zIndex(999999) // Highest possible z-index
+            }
+            
+            // Settings overlay - positioned at the absolute top layer
+            // ---- COMPLETELY SEPARATE BETTING AREA (NO LAYOUT INTERFERENCE) ----
+            if !isContinuousAutoPlay {
+                // Pre-compute chip positions using helper function
+                let chipPositions = computeChipPositions()
+                let centerX = UIScreen.main.bounds.width / 2
+                let chipsY = UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
+                let titleY = UIScreen.main.bounds.height * 0.7 - 30 - 88
+                let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
+                // Keep the on-table stacks exactly as-is; only shift their X positions via computeChipPositions().
+                let horizontal = false
+                
+                // Betting Area Title - SEPARATE VStack
+                Text("Betting Area")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(height: 24)
+                    .padding(.top, 12)
+                    .position(x: centerX, y: titleY)
+                    .zIndex(1001)
+                
+                // Shared debug palette for chip overlays
+                let debugColors: [Color] = [
+                    Color(red: 0.5, green: 0, blue: 0),      // dark red
+                    Color(red: 1.0, green: 0.4, blue: 0.4),  // light red
+                    Color(red: 0.8, green: 0.4, blue: 0.0),  // dark orange
+                    Color(red: 1.0, green: 0.65, blue: 0.3), // light orange
+                    Color(red: 0.7, green: 0.6, blue: 0.0),  // dark yellow
+                    Color(red: 0.9, green: 0.8, blue: 0.3),  // light yellow
+                    Color(red: 0.0, green: 0.2, blue: 0.5),  // dark blue
+                    Color(red: 0.4, green: 0.6, blue: 1.0)   // light blue
+                ]
+                
+                // Bet Chip Stack (Hand 2 / Left)
+                chipStackAnyView(chips: gameState.betChips, debugColors: debugColors, horizontal: horizontal)
+                    .position(x: centerX + chipPositions.hand2BetXOffset, y: chipsY)
+                .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
+                .zIndex(1001)
+                .animation(.none)
+                .transaction { $0.animation = nil }
+                .onAppear {
+                    if gameState.isSplit { print("🎰 CHIP STACK (H2 Bet): Fixed left position for split") }
+                }
+                
+                // Additional Bet Chips (Split Hand 1) - SEPARATE ZStack
+                if !gameState.additionalBetChips.isEmpty {
+                    chipStackAnyView(chips: gameState.additionalBetChips, debugColors: debugColors, horizontal: horizontal)
+                        .position(x: centerX + chipPositions.hand1BetXOffset, y: chipsY)
+                    .zIndex(1001)
+                    .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
+                    .onAppear {
+                        if gameState.isSplit { print("🎰 CHIP STACK (H1 Bet): Fixed right position for split") }
+                    }
+                }
+                
+                // Double Down Chips for Hand 2 (Left) - SEPARATE ZStack
+                if !gameState.doubleDownChipsHand2.isEmpty {
+                    chipStackAnyView(chips: gameState.doubleDownChipsHand2, debugColors: debugColors, horizontal: horizontal)
+                        .position(x: centerX + chipPositions.hand2DDXOffset, y: chipsY)
+                    .zIndex(1001)
+                    .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
+                    .onAppear {
+                        if gameState.isSplit {
+                            print("🎰 CHIP 3 (H2 DD User): Dynamically positioned")
+                        }
+                    }
+                }
+                
+                // Double Down Chips for Hand 1 (Right) - SEPARATE ZStack
+                if !gameState.doubleDownChipsHand1.isEmpty {
+                    chipStackAnyView(chips: gameState.doubleDownChipsHand1, debugColors: debugColors, horizontal: horizontal)
+                        .position(x: centerX + chipPositions.hand1DDXOffset, y: chipsY)
+                    .zIndex(1001)
+                    .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
+                    .onAppear {
+                        if gameState.isSplit {
+                            print("🎰 CHIP 7 (H1 DD User): Dynamically positioned")
+                        }
+                    }
+                }
+                
+                // Bet Amount Text with Unknown and Return Bet Buttons - SEPARATE ZStack
+                ZStack {
+                    // Centered Bet Amount Text
+                    Text("Bet: $\(gameState.displayBetAmount > 0 ? gameState.displayBetAmount : (gameState.playerBet > 0 ? gameState.playerBet : gameState.displayBetAmount))")
+                        .font(.fixedSystem(size: 18, weight: .semibold))
+                        .foregroundColor(.yellow)
+                        .padding(.vertical, 5)
+                    
+                    // Unknown Button on the left (Training Mode only) - with autoplay logic
+                    HStack {
+                        if !isContinuousAutoPlay && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
+                            Button(action: {
+                                // Start auto play mode (same as training mode enabled)
+                                UserDefaults.standard.set(true, forKey: "trainingModeEnabled")
+                                startContinuousAutoPlay()
+                            }) {
+                                Text("Autoplay")
+                                    .font(.fixedSystem(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color(hex: "ff0000"))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        Spacer()
+                    }
+                    
+                    // Return Bet Button on the right
+                    HStack {
+                        Spacer()
+                        if !gameState.betChips.isEmpty && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) && !isContinuousAutoPlay {
+                            Button(action: {
+                                bettingManager.returnBet(gameState: gameState)
+                            }) {
+                                Text("Return Bet")
+                                    .font(.fixedSystem(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color(hex: "ff0000"))
+                                    .cornerRadius(8)
+                            }
+                        }
+                    }
+                }
+                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 100)
+                .zIndex(1001)
+                
+                // Win/Lose/Push Notifications - SEPARATE
+                if let result = gameState.resultMessage, gameState.showResultNotification {
+                    if gameState.lastPayout > 0 {
+                        Text("Win $\(gameState.actualWinnings)")
+                            .font(.fixedSystem(size: 16, weight: .bold))
+                            .foregroundColor(.green)
+                            .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 120)
+                            .zIndex(1001)
+                    } else if gameState.lastPayout < 0 {
+                        Text("Lose $\(abs(gameState.lastPayout))")
+                            .font(.fixedSystem(size: 16, weight: .bold))
+                            .foregroundColor(.red)
+                            .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 120)
+                            .zIndex(1001)
+                    } else {
+                        Text("Push $\(gameState.actualWinnings)")
+                            .font(.fixedSystem(size: 16, weight: .bold))
+                            .foregroundColor(.green)
+                            .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 120)
+                            .zIndex(1001)
+                    }
+                }
+                
+                // User's Available Chips - SEPARATE
+                if !gameState.showNextHand {
+                    ChipSelectionView(
+                        gameState: gameState,
+                        bettingManager: bettingManager
+                    )
+                    .disabled(gameState.isDealing)
+                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 160 - 5)
+                    .zIndex(1001)
+                }
+            }
+            
             if showSettings {
                 SettingsOverlay(
                     showSettings: $showSettings,
@@ -586,11 +1101,7 @@ struct TrainingModeView: View {
                     gameState: gameState,
                     gameEngine: gameEngine
                 )
-            }
-        }
-        .overlay {
-            if gameState.showZeroChipsOverlay {
-                ZeroChipsOverlay(isPresented: $gameState.showZeroChipsOverlay)
+                .zIndex(999998) // Second highest z-index (below strategy chart)
             }
         }
         .frame(maxWidth: 1000) // Limit width on larger screens
@@ -604,6 +1115,136 @@ struct TrainingModeView: View {
             }
             // Ensure training mode is disabled by default when entering training mode view
             UserDefaults.standard.set(false, forKey: "trainingModeEnabled")
+            // Enable strategy hints by default in training mode for the yellow glow effect
+            if !UserDefaults.standard.bool(forKey: "showStrategyHints") {
+                UserDefaults.standard.set(true, forKey: "showStrategyHints")
+                showStrategyHints = true
+            }
+            // Ensure all cards are visible in training mode
+            visiblePlayerCount = gameState.dealtPlayerCards.count
+            visibleDealerCount = gameState.dealtDealerCards.count
+        }
+                .onChange(of: gameState.dealtPlayerCards) { newCards in
+            // Clear positions when cards are reset (new game) - like regular mode
+            if gameState.dealtPlayerCards.isEmpty {
+                finalPlayerPositions.removeAll()
+                finalDealerPositions.removeAll()
+            }
+            // Keep visible count static to prevent layout shifts
+            // visiblePlayerCount is set once on appear and stays static
+            print("🎓 Training Mode: dealtPlayerCards changed to \(newCards.count) cards - keeping visiblePlayerCount static")
+        }
+        .onChange(of: gameState.dealtDealerCards) { newCards in
+            // Ensure all dealt dealer cards are visible in training mode
+            visibleDealerCount = newCards.count
+            print("🎓 Training Mode: Updated visibleDealerCount to \(visibleDealerCount) for \(newCards.count) dealt cards")
+        }
+        .onChange(of: gameState.dealerHand.count) { dealerCount in
+            // In training mode, ensure all dealer cards are visible
+            let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+            if trainingModeEnabled {
+                visibleDealerCount = dealerCount
+            }
+        }
+        .onChange(of: gameState.splitHands) { splitHands in
+            // In training mode, ensure all split cards are visible
+            let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+            if trainingModeEnabled && gameState.isSplit {
+                let totalSplitCards = splitHands.flatMap { $0 }.count
+                print("🎓 Training Mode: Split hands changed - total cards: \(totalSplitCards)")
+                // Update visiblePlayerCount to show all split cards
+                visiblePlayerCount = totalSplitCards
+            }
+        }
+        .coordinateSpace(name: "table")
+        .onAppear {
+            gameState.isTrainingMode = true
+            tableSize = tableGeo.size
+            // Deck position will be set by the shoe overlay geometry reader
+            // Initialize numberOfDecks if not set
+            if gameState.numberOfDecks == 0 {
+                gameState.numberOfDecks = numberOfDecks
+            }
+            _ = UIImage(named: "DeckCover")
+            ["AS", "KH", "7D", "9C"].forEach { _ = UIImage(named: $0) }
+            gameEngine.resetDeck(gameState: gameState)
+            
+            // Hit animation callback (matching RegularModeView)
+            gameEngine.hitAnimationCallback = { [weak gameState] card, isPlayerCard, completion in
+                guard let gameState = gameState else { return }
+                
+                let currentCount = isPlayerCard ? gameState.dealtPlayerCards.count : gameState.dealtDealerCards.count
+                let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize)
+                let y = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
+                let destination = CGPoint(x: x, y: y)
+                
+                CardPositioning.recalculateAllCardPositions(
+                    isPlayerCard: isPlayerCard,
+                    newCount: currentCount + 1,
+                    tableSize: tableSize,
+                    dealtPlayerCards: gameState.dealtPlayerCards,
+                    dealtDealerCards: gameState.dealtDealerCards,
+                    finalPlayerPositions: &finalPlayerPositions,
+                    finalDealerPositions: &finalDealerPositions
+                )
+
+                CardAnimator.animateHit(
+                    card: card,
+                    to: destination,
+                    deckPosition: gameState.deckPosition,
+                    gameState: gameState
+                ) {
+                    withAnimation(.easeInOut(duration: 0.001)) { 
+                        completion() 
+                    }
+                    CardAnimator.cleanupAnimatedCard(
+                        card.id,
+                        gameState: gameState
+                    )
+                    if isPlayerCard { 
+                        visiblePlayerCount += 1 
+                    } else { 
+                        visibleDealerCount += 1 
+                    }
+                }
+            }
+            
+            // Split animation callback (matching RegularModeView)
+            gameEngine.splitAnimationCallback = { [weak gameState] card, handIndex, completion in
+                guard let gameState = gameState else { return }
+                
+                let countBefore = gameState.splitHands[handIndex].count
+                let destination = CardPositioning.splitStaticPosition(
+                    handIndex: handIndex, 
+                    cardIndex: countBefore, 
+                    totalCards: countBefore + 1, 
+                    tableSize: tableSize
+                )
+                finalSplitPositions[handIndex][card.id] = destination
+                
+                print("🎯 Split Animation: card=\(card.rank.rawValue)\(card.suit.rawValue), handIndex=\(handIndex), destination=\(destination), deckPosition=\(gameState.deckPosition)")
+
+                CardAnimator.animateSplit(
+                    card: card,
+                    to: destination,
+                    deckPosition: gameState.deckPosition,
+                    gameState: gameState
+                ) {
+                    CardAnimator.cleanupAnimatedCard(
+                        card.id,
+                        gameState: gameState
+                    )
+                    completion()
+                }
+            }
+        }
+        .onChange(of: tableGeo.size) { newSize in
+            tableSize = newSize
+        }
+        .onDisappear {
+            gameEngine.hitAnimationCallback = nil
+            gameEngine.splitAnimationCallback = nil
+        }
         }
     }
     
@@ -627,6 +1268,12 @@ struct TrainingModeView: View {
     
     // Track if user is currently dragging the slider
     @State private var isDraggingSpeed: Bool = false
+    
+    // Layout constants (now using shared CardMetrics)
+    
+    // Table geometry tracking
+    // Visible counts (now using shared state from top)
+    
     
     // Binding for the inverted slider (so slow is on left, fast is on right)
     private var sliderSpeedBinding: Binding<Double> {
@@ -657,6 +1304,44 @@ struct TrainingModeView: View {
         }
     }
     
+    // MARK: - Layout helpers (now using shared CardPositioning)
+    
+    // MARK: - Labels (from regular mode)
+    private func playerValueLabel() -> String {
+        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
+        
+        // In training mode, use dealtPlayerCards for score calculation to match displayed cards
+        // This fixes the invisible card issue where cards are displayed but not counted in score
+        let shown = trainingModeEnabled ? gameState.dealtPlayerCards : Array(gameState.playerHand.prefix(visiblePlayerCount))
+        guard !shown.isEmpty else { return "0" }
+        return gameEngine.getHandValueText(shown)
+    }
+    
+    private func isHandActive(_ handIndex: Int) -> Bool {
+        // Check if this hand is the current active hand
+        guard gameState.activeHandIndex == handIndex else { return false }
+        
+        // Check if the player can still take actions on this hand
+        let hand = gameState.splitHands[handIndex]
+        
+        // If hand has blackjack (21), it's not active
+        if gameEngine.isBlackjack(hand) {
+            return false
+        }
+        
+        // If hand is busted, it's not active
+        if gameEngine.isBust(hand) {
+            return false
+        }
+        
+        // If we're in dealer's turn (not player's turn), no hands are active
+        if !gameState.isPlayerTurn {
+            return false
+        }
+        
+        return true
+    }
+    
     // Helper function to get safe delay with minimum limits
     private func safeDelay(_ baseDelay: Double) -> Double {
         let adjustedDelay = baseDelay * autoPlaySpeed
@@ -680,14 +1365,8 @@ struct TrainingModeView: View {
         func checkProcessing() {
             // Double-check that we should still be auto-playing
             let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-            print("🔄 Processing Check: trainingEnabled=\(trainingModeEnabled), isContinuous=\(isContinuousAutoPlay), isPlayerTurn=\(gameState.isPlayerTurn), isAutoPlaying=\(isAutoPlaying)")
             
             guard trainingModeEnabled && (isContinuousAutoPlay || stopRequested) && gameState.isPlayerTurn && !isAutoPlaying else {
-                print("🎓 Training Mode: ❌ PROCESSING CHECK STOPPED - Conditions changed")
-                print("  - trainingEnabled: \(trainingModeEnabled)")
-                print("  - isContinuousAutoPlay: \(isContinuousAutoPlay)")
-                print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-                print("  - isAutoPlaying: \(isAutoPlaying)")
                 return
             }
             
@@ -725,6 +1404,20 @@ struct TrainingModeView: View {
     // MARK: - Continuous Auto-Play Functions
     private func startContinuousAutoPlay() {
         print("🎓 Starting continuous auto-play...")
+        
+        // Return any chips placed on the betting area before starting auto play
+        if gameState.playerBet > 0 {
+            print("🎓 Returning \(gameState.playerBet) chips before starting auto play...")
+            // Return all bet chips to the user
+            for chip in gameState.betChips {
+                XPChipManager.shared.updateChips(chip)
+            }
+            // Clear the bet
+            gameState.playerBet = 0
+            gameState.betChips = []
+            print("🎓 Chips returned successfully")
+        }
+        
         isContinuousAutoPlay = true
         // Sync temp slider position with current speed
         tempSliderSpeed = 3.3 - autoPlaySpeed
@@ -745,20 +1438,10 @@ struct TrainingModeView: View {
                 let playerValue = gameEngine.handValue(gameState.playerHand)
                 let handCount = gameState.playerHand.count
                 
-                print("🎓 Training Mode: 🔍 BACKUP MONITOR CHECK:")
-                print("  - Player value: \(playerValue)")
-                print("  - Hand count: \(handCount)")
-                print("  - isAutoPlaying: \(self.isAutoPlaying)")
-                print("  - isProcessingAction: \(gameState.isProcessingAction)")
-                
                 if handCount >= 2 && playerValue >= 17 && playerValue <= 21 && !self.isAutoPlaying && !gameState.isProcessingAction {
-                    print("🎓 Training Mode: ⚠️ BACKUP MONITOR DETECTED STUCK AUTO-PLAY AT \(playerValue)!")
-                    print("🎓 Training Mode: 🔄 FORCING STAND ACTION...")
                     // Force stand action if player has 17+ and auto play is stuck
                     gameEngine.standAction(gameState: gameState)
                 } else if handCount >= 2 && playerValue < 17 && playerValue > 0 && !self.isAutoPlaying && !gameState.isProcessingAction {
-                    print("🎓 Training Mode: ⚠️ BACKUP MONITOR DETECTED STUCK AUTO-PLAY AT \(playerValue)!")
-                    print("🎓 Training Mode: 🔄 FORCING AUTO-PLAY CONTINUATION...")
                     self.waitForProcessingToComplete()
                 }
             }
@@ -816,16 +1499,62 @@ struct TrainingModeView: View {
         // Reset auto-play flag for new hand
         isAutoPlaying = false
         
-        // Set minimum bet for training mode
-        if gameState.playerBet == 0 {
+        // Set minimum bet for training mode only if user has placed chips
+        if gameState.playerBet == 0 && !gameState.betChips.isEmpty {
             gameState.playerBet = 10
         }
         
         print("🎓 Dealing next training hand...")
-        gameEngine.dealInitialCards(gameState: gameState)
+        gameEngine.dealInitialCards(
+            gameState: gameState,
+            useRegularModeAnimation: true,
+            animationCallback: { card, index, completion in
+                // index: 0=P1, 1=D1 (hole), 2=P2, 3=D2 (up)
+                if index == 0 {
+                    visiblePlayerCount = 0
+                    visibleDealerCount = 0
+                    dealerHoleRevealed = false
+                    finalPlayerPositions.removeAll()
+                    finalDealerPositions.removeAll()
+                    finalSplitPositions = Array(repeating: [:], count: 2)
+                }
+
+                let isPlayer = (index == 0 || index == 2)
+                let slotIndex: Int = isPlayer ? (index == 0 ? 0 : 1) : (index == 1 ? 0 : 1)
+
+                let midX = tableSize.width * 0.5
+                let startX = midX - (CardMetrics.cardSpacing / 2)
+                let x = startX + CGFloat(slotIndex) * CardMetrics.cardSpacing
+                let y = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                let destination = CGPoint(x: x, y: y)
+
+                if isPlayer { finalPlayerPositions[card.id] = destination }
+                else { finalDealerPositions[card.id] = destination }
+
+                let shouldFlip = (index != 1)
+                CardAnimator.animateDeal(
+                    card: card,
+                    to: destination,
+                    shouldFlip: shouldFlip,
+                    deckPosition: gameState.deckPosition,
+                    gameState: gameState
+                ) {
+                    withAnimation(.easeInOut(duration: 0.001)) { completion() }
+                    CardAnimator.cleanupAnimatedCard(
+                        card.id,
+                        gameState: gameState
+                    )
+                    if isPlayer { 
+                        visiblePlayerCount += 1 
+                    } else { 
+                        visibleDealerCount += 1 
+                    }
+                }
+            }
+        )
         
         // Trigger auto-play after initial cards are dealt (speed adjusted with safe minimums)
-        DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(2.0)) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(1.0)) { // Reduced from 2.0 to 1.0 seconds
             guard self.isContinuousAutoPlay else { return }
             print("🎓 Training Mode: Initial deal complete, triggering auto-play...")
             self.checkAndAutoPlay()
@@ -842,13 +1571,7 @@ struct TrainingModeView: View {
         let hasAce = gameState.playerHand.contains { $0.rank == .ace }
         let softHandText = gameEngine.getHandValueText(gameState.playerHand)
         
-        print("🎓 Training Mode: checkAndAutoPlay() called")
-        print("🎓 Training Mode: trainingEnabled=\(trainingModeEnabled), isPlayerTurn=\(gameState.isPlayerTurn), playerValue=\(playerValue), isBusted=\(isBusted)")
-        print("🎓 Training Mode: playerHand=\(gameState.playerHand.map { "\($0.rank.rawValue) of \($0.suit.rawValue)" })")
-        print("🎓 Training Mode: hasAce=\(hasAce), handText='\(softHandText)'")
-        print("🎓 Training Mode: isAutoPlaying=\(isAutoPlaying), isContinuousAutoPlay=\(isContinuousAutoPlay)")
-        print("🎓 Training Mode: isProcessingAction=\(gameState.isProcessingAction), handCount=\(gameState.playerHand.count)")
-        print("🎓 Training Mode: isDraggingSpeed=\(isDraggingSpeed)")
+        // Check and auto-play called
         
         // Enhanced guard conditions - allow current hand to continue even if stop requested
         guard trainingModeEnabled && 
@@ -857,33 +1580,16 @@ struct TrainingModeView: View {
               !isAutoPlaying && 
               !gameState.isProcessingAction &&
               gameState.playerHand.count >= 2 else {
-            print("🎓 Training Mode: ❌ AUTO-PLAY BLOCKED - CONDITIONS NOT MET:")
-            print("  - trainingEnabled: \(trainingModeEnabled)")
-            print("  - isContinuousAutoPlay: \(isContinuousAutoPlay)")
-            print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-            print("  - isAutoPlaying: \(isAutoPlaying)")
-            print("  - isProcessingAction: \(gameState.isProcessingAction)")
-            print("  - handCount: \(gameState.playerHand.count)")
             return
         }
         
         // Check for bust first - if busted, don't take any action (game should end automatically)
         if isBusted {
-            print("🎓 Training Mode: ❌ Player busted at \(playerValue) - stopping auto-play")
             return
         }
         
         // Set flag to prevent multiple actions
         isAutoPlaying = true
-        
-        print("🎓 Training Mode: 🎯 DECISION TIME - Player value: \(playerValue)")
-        if hasAce && playerValue >= 17 {
-            print("🎓 Training Mode: ✅ WILL STAND - SOFT \(playerValue) (has Ace)")
-        } else if playerValue >= 17 {
-            print("🎓 Training Mode: ✅ WILL STAND - HARD \(playerValue)")
-        } else {
-            print("🎓 Training Mode: ✅ WILL HIT (value \(playerValue) < 17)")
-        }
         
         // Auto-stand if player has 17 or higher (and not busted)
         if playerValue >= 17 {
@@ -898,54 +1604,22 @@ struct TrainingModeView: View {
                 handDescription = "HARD \(playerValue)"
             }
             
-            print("🎓 Training Mode: ✅ Player auto-standing at \(handDescription)")
-            print("🎓 Training Mode: Hand details - \(gameState.playerHand.count) cards: \(gameState.playerHand.map { "\($0.rank.rawValue)" }.joined(separator: ", "))")
-            print("🎓 Training Mode: Full hand text: '\(softHandText)'")
-            print("🎓 Training Mode: Before stand - isPlayerTurn=\(gameState.isPlayerTurn)")
-            print("🎓 Training Mode: Before stand - dealerHand=\(gameState.dealerHand.count), flippedCards=\(gameState.flippedDealerCards)")
+            // Player auto-standing
             
             // For 21 or soft 20, use slightly shorter delay to ensure immediate response
-            let standDelay = (playerValue == 21 || (hasAce && playerValue == 20)) ? safeDelay(0.8) : safeDelay(1.0)
+            let standDelay = (playerValue == 21 || (hasAce && playerValue == 20)) ? safeDelay(0.4) : safeDelay(0.5) // Reduced delays
             DispatchQueue.main.asyncAfter(deadline: .now() + standDelay) {
-                print("🎓 Training Mode: 🎯 EXECUTING STAND ACTION NOW...")
-                print("🎓 Training Mode: Pre-stand state - isPlayerTurn=\(gameState.isPlayerTurn), isSplit=\(gameState.isSplit)")
-                
                 // Store the state before calling standAction
                 let wasPlayerTurn = gameState.isPlayerTurn
                 
                 gameEngine.standAction(gameState: gameState)
                 
-                print("🎓 Training Mode: 🎯 STAND ACTION COMPLETED")
-                print("🎓 Training Mode: Post-stand state - isPlayerTurn=\(gameState.isPlayerTurn)")
-                print("🎓 Training Mode: Post-stand dealer - dealerHand=\(gameState.dealerHand.count), flippedCards=\(gameState.flippedDealerCards)")
-                
-                // Add immediate check to see if dealer turn started
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("🎓 Training Mode: 🔍 IMMEDIATE CHECK (0.5s after stand):")
-                    print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-                    print("  - flippedDealerCards: \(gameState.flippedDealerCards)")
-                    print("  - dealerHand count: \(gameState.dealerHand.count)")
-                    print("  - visuallyRevealedDealerHand: \(gameState.visuallyRevealedDealerHand.count)")
-                    print("  - resultMessage: \(gameState.resultMessage ?? "nil")")
-                    print("  - isDealing: \(gameState.isDealing)")
-                }
-                
                 // Check if standAction actually worked (player turn should end)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    print("🎓 Training Mode: 🔍 DELAYED CHECK (2.0s after stand):")
-                    print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-                    print("  - flippedDealerCards: \(gameState.flippedDealerCards)")
-                    
                     if gameState.isPlayerTurn == wasPlayerTurn && gameState.isPlayerTurn {
-                        let currentValue = gameEngine.handValue(gameState.playerHand)
-                        print("🎓 Training Mode: ⚠️ STAND ACTION FAILED - Player turn didn't end!")
-                        print("🎓 Training Mode: Current player value: \(currentValue)")
-                        print("🎓 Training Mode: Forcing dealer turn manually...")
                         // Force the dealer turn manually
                         gameState.isPlayerTurn = false
                     } else if gameState.flippedDealerCards.count <= 1 && gameState.resultMessage == nil {
-                        print("🎓 Training Mode: ⚠️ DEALER TURN STARTED BUT HOLE CARD NOT FLIPPED!")
-                        print("🎓 Training Mode: Manually triggering dealer card reveal...")
                         // Force dealer hole card flip
                         gameState.flippedDealerCards.insert(0)
                         if gameState.dealerHand.count > 0 {
@@ -958,34 +1632,22 @@ struct TrainingModeView: View {
             }
         } else if playerValue < 17 {
             // Auto-hit if player has less than 17 (and not busted)
-            print("🎓 Training Mode: 🎯 Player auto-hitting at \(playerValue)")
-            print("🎓 Training Mode: Current hand before hit: \(gameState.playerHand.map { "\($0.rank.rawValue)" }.joined(separator: ", "))")
-            DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(1.0)) {
-                print("🎓 Training Mode: 🔥 EXECUTING HIT ACTION NOW...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(0.5)) { // Reduced from 1.0 to 0.5 seconds
                 gameEngine.hitAction(gameState: gameState)
-                print("🎓 Training Mode: 🔥 HIT ACTION COMPLETED")
                 
                 // Add verification that hit worked
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { // Reduced from 1.0 to 0.5 seconds
                     let newHandCount = gameState.playerHand.count
                     let newValue = gameEngine.handValue(gameState.playerHand)
-                    print("🎓 Training Mode: 🔍 HIT VERIFICATION:")
-                    print("  - New hand count: \(newHandCount)")
-                    print("  - New hand value: \(newValue)")
-                    print("  - New hand: \(gameState.playerHand.map { "\($0.rank.rawValue)" }.joined(separator: ", "))")
-                    print("  - isPlayerTurn: \(gameState.isPlayerTurn)")
-                    print("  - Should continue: \(newValue < 17 && newValue <= 21 && gameState.isPlayerTurn)")
                     
                     // If we should continue hitting but auto-play stopped, force it
                     if newValue < 17 && newValue <= 21 && gameState.isPlayerTurn && !self.isAutoPlaying {
-                        print("🎓 Training Mode: ⚠️ AUTO-PLAY STOPPED INCORRECTLY - FORCING CONTINUATION")
                         self.waitForProcessingToComplete()
                     }
                 }
             }
             // Reset flag after a short delay to allow for next auto-play check (speed adjusted with safe minimums)
-            DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(1.2)) {
-                print("🎓 Training Mode: 🔄 Resetting isAutoPlaying flag")
+            DispatchQueue.main.asyncAfter(deadline: .now() + safeDelay(0.6)) { // Reduced from 1.2 to 0.6 seconds
                 self.isAutoPlaying = false
             }
         } else {
@@ -998,11 +1660,20 @@ struct TrainingModeView: View {
     private func dealerValueLabel() -> String {
         let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
         
-        if gameState.visuallyRevealedDealerHand.count < 1 {
+        // If no dealer cards are dealt yet, show "?"
+        if gameState.dealerHand.isEmpty {
             return "?"
-        } else if trainingModeEnabled && gameState.isPlayerTurn {
+        }
+        
+        // If dealer cards are showing deck covers (face-down), show "?"
+        // Check if any dealer cards are actually face-up by looking at flippedDealerCards
+        if gameState.flippedDealerCards.isEmpty {
+            return "?"
+        }
+        
+        if trainingModeEnabled && gameState.isPlayerTurn {
             // In training mode during player turn, only show the up card (second card)
-            if gameState.dealerHand.count >= 2 {
+            if gameState.dealerHand.count >= 2 && gameState.flippedDealerCards.contains(1) {
                 return gameEngine.getHandValueText([gameState.dealerHand[1]])
             } else {
                 return "?"
@@ -1016,7 +1687,11 @@ struct TrainingModeView: View {
             return gameEngine.getHandValueText(fullyRevealedCards)
         } else if gameState.isPlayerTurn {
             // During player turn, only show the second dealer card (index 1 in dealt cards, but index 0 in visually revealed)
+            if gameState.visuallyRevealedDealerHand.count > 0 {
             return gameEngine.getHandValueText([gameState.visuallyRevealedDealerHand[0]])
+            } else {
+                return "?"
+            }
         } else {
             // Only show cards that are fully revealed for counting purposes
             let fullyRevealedCards = gameState.visuallyRevealedDealerHand.enumerated().compactMap { index, card in
@@ -1059,117 +1734,6 @@ struct TrainingModeView: View {
 }
 
 // MARK: - Strategy Chart Overlay
-struct StrategyChartOverlay: View {
-    @Binding var showStrategyChart: Bool
-    
-    var body: some View {
-        Color.black.opacity(0.5)
-            .ignoresSafeArea()
-            .onTapGesture { showStrategyChart = false }
-        
-        VStack(spacing: 16) {
-            Text("Blackjack Strategy Chart")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.yellow)
-                .padding(.top, 16)
-            
-            // Key legend
-            HStack(spacing: 12) {
-                LegendCell(label: "H", text: "Hit", color: .green)
-                LegendCell(label: "D", text: "Double Down", color: .orange)
-                LegendCell(label: "S", text: "Stand", color: .red)
-                LegendCell(label: "P", text: "Split", color: .purple)
-            }
-            .padding(.bottom, 4)
-            
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 18) {
-                    // Hard Totals
-                    Text("Hard Totals")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    StrategyChartView(
-                        headers: ["Total", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A"],
-                        rows: [
-                            ["5-7", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H"],
-                            ["8",   "H", "H", "H", "H", "D", "H", "H", "H", "H", "H"],
-                            ["9",   "D", "D", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["10",  "D", "D", "D", "D", "D", "D", "D", "H", "H", "H"],
-                            ["11",  "D", "D", "D", "D", "D", "D", "D", "D", "D", "D"],
-                            ["12",  "H", "H", "S", "S", "S", "H", "H", "H", "H", "H"],
-                            ["13-16", "S", "S", "S", "S", "S", "H", "H", "H", "H", "H"],
-                            ["17+", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S"]
-                        ]
-                    )
-                    
-                    // Soft Totals
-                    Text("Soft Totals (one Ace counted as 11)")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    StrategyChartView(
-                        headers: ["Soft Total", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A"],
-                        rows: [
-                            ["A2/13", "H", "H", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["A3/14", "H", "H", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["A4/15", "H", "H", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["A5/16", "H", "D", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["A6/17", "D", "D", "D", "D", "D", "H", "H", "H", "H", "H"],
-                            ["A7/18", "S", "D", "D", "D", "D", "S", "S", "H", "H", "H"],
-                            ["A8/19", "S", "S", "S", "S", "D", "S", "S", "S", "S", "S"],
-                            ["A9/20+", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S"]
-                        ]
-                    )
-                    
-                    // Pair Splits
-                    Text("Pair Splits")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    StrategyChartView(
-                        headers: ["Pair", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A"],
-                        rows: [
-                            ["2-2", "P", "P", "P", "P", "P", "P", "H", "H", "H", "H"],
-                            ["3-3", "P", "P", "P", "P", "P", "P", "H", "H", "H", "H"],
-                            ["4-4", "H", "H", "P", "P", "P", "H", "H", "H", "H", "H"],
-                            ["5-5", "D", "D", "D", "D", "D", "D", "D", "H", "H", "H"],
-                            ["6-6", "P", "P", "P", "P", "P", "P", "H", "H", "H", "H"],
-                            ["7-7", "P", "P", "P", "P", "P", "P", "H", "S", "H", "H"],
-                            ["8-8", "P", "P", "P", "P", "P", "P", "P", "P", "P", "P"],
-                            ["9-9", "P", "P", "P", "S", "P", "P", "S", "P", "S", "P"],
-                            ["10-10", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S"],
-                            ["A-A", "P", "P", "P", "P", "P", "P", "P", "P", "P", "P"]
-                        ]
-                    )
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-            }
-            .frame(width: 400, height: 500)
-            .background(Color(hex: "23272a").opacity(0.98))
-            .cornerRadius(22)
-            
-            Button(action: { showStrategyChart = false }) {
-                Text("Close")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "ff0000"))
-                    .cornerRadius(12)
-            }
-            
-            Spacer()
-        }
-        .frame(maxWidth: 440)
-        .background(Color(hex: "23272a").opacity(0.98))
-        .cornerRadius(28)
-        .shadow(radius: 24)
-        .padding(.top, 60)
-    }
-}
 
 // MARK: - Settings Overlay
 struct SettingsOverlay: View {
@@ -1366,79 +1930,7 @@ struct SettingsTabView: View {
     }
 }
 
-// MARK: - Achievements Tab View
-struct AchievementsTabView: View {
-    var body: some View {
-        let achievements: [Achievement] = [
-            Achievement(title: "Reach Level 5", description: "Reach player level 5", current: 3, goal: 5),
-            Achievement(title: "Reach Level 10", description: "Reach player level 10", current: 7, goal: 10),
-            Achievement(title: "Reach Level 20", description: "Reach player level 20", current: 12, goal: 20),
-            Achievement(title: "Reach Level 30", description: "Reach player level 30", current: 18, goal: 30),
-            Achievement(title: "Reach Level 40", description: "Reach player level 40", current: 25, goal: 40),
-            Achievement(title: "Reach Level 50", description: "Reach player level 50", current: 32, goal: 50),
-            Achievement(title: "First Blackjack!", description: "Get a natural blackjack (Ace + 10) in a hand", current: 1, goal: 1),
-            Achievement(title: "Double Down!", description: "Double down 10 times", current: 4, goal: 10),
-            Achievement(title: "Split Master", description: "Split pairs 5 times", current: 2, goal: 5),
-            Achievement(title: "Winning Streak", description: "Win 10 hands in a row", current: 6, goal: 10),
-            Achievement(title: "Push It Real Good", description: "Get 10 pushes (ties)", current: 3, goal: 10),
-            Achievement(title: "Chip Collector", description: "Accumulate 1,000 chips", current: 500, goal: 1000),
-            Achievement(title: "Card Counter", description: "Keep a running count above +10", current: 8, goal: 10),
-            Achievement(title: "Dealer Busted!", description: "Win 10 hands where the dealer busts", current: 5, goal: 10),
-            Achievement(title: "Insurance Expert", description: "Take insurance 5 times", current: 1, goal: 5),
-            Achievement(title: "Perfect Strategy", description: "Play 20 hands with perfect basic strategy", current: 10, goal: 20),
-            Achievement(title: "Quiz Whiz", description: "Score 100% on a quiz", current: 0, goal: 1),
-            Achievement(title: "Big Winner", description: "Win a hand with a bet of 100 chips or more", current: 1, goal: 1),
-            Achievement(title: "Comeback Kid", description: "Win after being down to your last 10 chips", current: 0, goal: 1),
-            Achievement(title: "Five Card Charlie", description: "Win a hand with 5 cards without busting", current: 0, goal: 1),
-            Achievement(title: "Lucky 7s", description: "Get three 7s in a hand", current: 0, goal: 1),
-            Achievement(title: "High Roller", description: "Place a bet of 500 chips", current: 0, goal: 1),
-            Achievement(title: "No Busts!", description: "Play 10 hands in a row without busting", current: 4, goal: 10),
-            Achievement(title: "Dealer Blackjack", description: "Lose to a dealer blackjack 5 times", current: 2, goal: 5),
-            Achievement(title: "All In!", description: "Bet all your chips in one hand", current: 0, goal: 1)
-        ]
-        
-        ScrollView {
-            VStack(spacing: 18) {
-                ForEach(achievements) { achievement in
-                    HStack(alignment: .center, spacing: 14) {
-                        Image(systemName: achievement.isComplete ? "trophy.fill" : "trophy")
-                            .foregroundColor(achievement.isComplete ? .yellow : .gray)
-                            .font(.title2)
-                            .frame(width: 32)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(achievement.title)
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Text(achievement.description)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            AchievementProgressBar(progress: min(Double(achievement.current) / Double(achievement.goal), 1.0))
-                                .frame(height: 10)
-                            Text("\(achievement.current)/\(achievement.goal)")
-                                .font(.caption2)
-                                .foregroundColor(.yellow)
-                        }
-                        
-                        Spacer()
-                        
-                        if achievement.isComplete {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundColor(.green)
-                                .font(.title3)
-                        }
-                    }
-                    .padding(10)
-                    .background(Color(hex: "23272a").opacity(0.85))
-                    .cornerRadius(12)
-                }
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 4)
-        }
-        .frame(maxWidth: 340, minHeight: 220, maxHeight: 340)
-    }
-}
+// Note: AchievementsTabView moved to GameAchievements.swift
 
 #Preview {
     TrainingModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1))
@@ -1508,6 +2000,124 @@ struct ArchText: View {
             }
         }
         .frame(width: width, height: height)
+    }
+}
+
+// MARK: - Betting Area View (Extracted for Compiler Performance)
+struct BettingAreaView: View {
+    @ObservedObject var gameState: BlackjackGameState
+    let bettingManager: BlackjackBettingManager
+    let gameEngine: BlackjackGameEngine
+    let tableSize: CGSize?
+    @Binding var isContinuousAutoPlay: Bool
+    let startContinuousAutoPlay: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) { // Original spacing to match previous layout
+            // Betting Area Title
+            Text("Betting Area")
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(height: 24)
+                .padding(.top, 12)
+            
+            // Spiral Chip Stack
+            ZStack {
+                ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
+                    let angle = Double(index) * 0.8
+                    let radius: CGFloat = 2.0
+                    let xOffset = radius * cos(angle)
+                    let yOffset = radius * sin(angle)
+                    
+                    ChipView(chip: Chip(value: chipValue))
+                        .offset(x: xOffset, y: yOffset)
+                        .zIndex(Double(index))
+                        .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
+                        .animation(.none)
+                        .transition(.identity)
+                        .transaction { $0.animation = nil }
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(height: 60)
+            .animation(.none)
+            .transaction { $0.animation = nil }
+            
+            // Bet Amount Text with Return Bet Button
+            ZStack {
+                // Centered Bet Amount Text
+                Text("Bet: $\(gameState.playerBet)")
+                    .font(.fixedSystem(size: 18, weight: .semibold))
+                    .foregroundColor(.yellow)
+                    .padding(.vertical, 5)
+                
+                // Unknown Button on the left (Training Mode only) - with autoplay logic
+                HStack {
+                    if !isContinuousAutoPlay && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
+                        Button(action: {
+                            // Start auto play mode (same as training mode enabled)
+                            UserDefaults.standard.set(true, forKey: "trainingModeEnabled")
+                            startContinuousAutoPlay()
+                        }) {
+                            Text("Autoplay")
+                                .font(.fixedSystem(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "ff0000"))
+                                .cornerRadius(8)
+                        }
+                    }
+                    Spacer()
+                }
+                
+                // Return Bet Button on the right
+                HStack {
+                    Spacer()
+                    if !gameState.betChips.isEmpty && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) && !isContinuousAutoPlay {
+                        Button(action: {
+                            bettingManager.returnBet(gameState: gameState)
+                        }) {
+                            Text("Return Bet")
+                                .font(.fixedSystem(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "ff0000"))
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+            
+            // Win/Lose/Push Notifications
+            if let result = gameState.resultMessage, gameState.showResultNotification {
+                if gameState.lastPayout > 0 {
+                    Text("Win $\(gameState.actualWinnings)")
+                        .font(.fixedSystem(size: 16, weight: .bold))
+                        .foregroundColor(.green)
+                } else if gameState.lastPayout < 0 {
+                    Text("Lose $\(abs(gameState.actualWinnings))")
+                        .font(.fixedSystem(size: 16, weight: .bold))
+                        .foregroundColor(.red)
+                } else {
+                    Text("Push $\(gameState.actualWinnings)")
+                        .font(.fixedSystem(size: 16, weight: .bold))
+                        .foregroundColor(.green)
+                }
+            }
+            
+            // User's Available Chips
+            if !gameState.showNextHand {
+                ChipSelectionView(
+                    gameState: gameState,
+                    bettingManager: bettingManager
+                )
+                .disabled(gameState.isDealing)
+            }
+            
+            
+        }
     }
 }
 

@@ -146,14 +146,6 @@ struct FlipCardView: View {
     
     var body: some View {
         ZStack {
-            // Only show underglow when card is face-up
-            if cardUnderglow && showingFace && glowColor != .clear {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(glowColor)
-                    .frame(width: glowWidth, height: 98)
-                    .blur(radius: 12)
-                    .opacity(0.7)
-            }
             
             Group {
                 if isAnimatingFlip {
@@ -201,6 +193,7 @@ struct FlipCardView: View {
                 }
             }
             .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
+            .animation(.easeInOut(duration: 0.3), value: showingFace)
             }
         .onAppear {
             showingFace = isFlipped
@@ -222,38 +215,12 @@ struct FlipCardView: View {
         }
     }
     
-    // Calculate the card image name based on card value (uses your spelled-out assets)
+    // Calculate the card image name based on card value (uses regular assets for regular mode)
     private var cardImageName: String {
-        let rankString: String
-        switch card.rank {
-        case .ace: rankString = "Ace"
-        case .jack: rankString = "Jack"
-        case .queen: rankString = "Queen"
-        case .king: rankString = "King"
-        default: rankString = "\(card.rank.rawValue)"
-        }
-        
-        let suitString: String
-        switch card.suit {
-        case .spades: suitString = "Spades"
-        case .hearts: suitString = "Hearts"
-        case .diamonds: suitString = "Diamonds"
-        case .clubs: suitString = "Clubs"
-        }
-        
-        return "\(rankString)Of\(suitString)"
+        // Use face image regardless of `card.isFaceUp` — flip state is driven by `isFlipped`.
+        return card.faceImageName(isTrainingMode: false)
     }
     
-    private var glowColor: Color {
-        switch card.rank {
-        case .ten, .jack, .queen, .king, .ace:
-            return Color.red
-        case .two, .three, .four, .five, .six:
-            return Color.green
-        default:
-            return Color.clear
-        }
-    }
 }
 
 // MARK: - Card View
@@ -267,13 +234,6 @@ struct CardView: View {
     
     var body: some View {
         ZStack {
-            if cardUnderglow && glowColor != .clear {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(glowColor)
-                    .frame(width: glowWidth, height: 98)
-                    .blur(radius: 12)
-                    .opacity(0.7)
-            }
             
             if imageLoadFailed {
                 // Fallback placeholder
@@ -292,39 +252,30 @@ struct CardView: View {
                         }
                     )
             } else {
-                Image(card.imageName)
+                Image(card.imageName(isTrainingMode: false))
                     .resizable()
                     .aspectRatio(0.7, contentMode: .fit)
                     .frame(width: width, height: 90)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .onAppear {
                         // Check if image exists
-                        if UIImage(named: card.imageName) == nil {
-                            print("❌ Image not found: \(card.imageName)")
+                        if UIImage(named: card.imageName(isTrainingMode: false)) == nil {
+                            print("❌ Image not found: \(card.imageName(isTrainingMode: false))")
                             imageLoadFailed = true
                         }
                     }
             }
         }
         .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
+        .animation(.easeInOut(duration: 0.3), value: appeared)
         .offset(y: appeared ? 0 : -250)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.4), value: appeared)
         .onAppear { 
             appeared = true
-            print("🃏 Loading card image: \(card.imageName) for \(card.rank.rawValue) of \(card.suit.rawValue)")
+            print("🃏 Loading card image: \(card.imageName(isTrainingMode: false)) for \(card.rank.rawValue) of \(card.suit.rawValue)")
         }
     }
     
-    private var glowColor: Color {
-        switch card.rank {
-        case .ten, .jack, .queen, .king, .ace:
-            return Color.red
-        case .two, .three, .four, .five, .six:
-            return Color.green
-        default:
-            return Color.clear
-        }
-    }
 } 
 

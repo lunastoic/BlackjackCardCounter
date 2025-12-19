@@ -9,6 +9,18 @@ import SwiftUI
 
 @main
 struct BlackjackCardCounterApp: App {
+    init() {
+        // Ensure card underglow is enabled by default on first launch
+        if UserDefaults.standard.object(forKey: "cardUnderglow") == nil {
+            UserDefaults.standard.set(true, forKey: "cardUnderglow")
+        }
+        
+        // DISABLE DEBUG SETTINGS BY DEFAULT to ensure proper randomization
+        UserDefaults.standard.set(false, forKey: "debugForcePairs")
+        UserDefaults.standard.set(false, forKey: "debugForce10s")
+        print("🎲 App initialized: Debug settings disabled for proper randomization")
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

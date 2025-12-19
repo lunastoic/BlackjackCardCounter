@@ -93,14 +93,20 @@ struct SettingsView: View {
                                     Text("Force Pairs (Split Testing)")
                                         .foregroundColor(.white)
                                         .fontWeight(.medium)
-                                    Text("Always deal pairs for testing split functionality")
+                                    Text("Player gets pairs for splitting, dealer always busts")
                                         .font(.caption)
                                         .foregroundColor(.gray)
                                 }
                                 Spacer()
                                 Toggle("", isOn: .init(
                                     get: { UserDefaults.standard.bool(forKey: "debugForcePairs") },
-                                    set: { UserDefaults.standard.set($0, forKey: "debugForcePairs") }
+                                    set: { 
+                                        UserDefaults.standard.set($0, forKey: "debugForcePairs")
+                                        // Reset deck when toggling to ensure fresh randomization
+                                        if !$0 {
+                                            print("🎲 Force Pairs DISABLED - Resetting deck for fresh randomization")
+                                        }
+                                    }
                                 ))
                                 .labelsHidden()
                             }
@@ -118,7 +124,13 @@ struct SettingsView: View {
                                 Spacer()
                                 Toggle("", isOn: .init(
                                     get: { UserDefaults.standard.bool(forKey: "debugForce10s") },
-                                    set: { UserDefaults.standard.set($0, forKey: "debugForce10s") }
+                                    set: { 
+                                        UserDefaults.standard.set($0, forKey: "debugForce10s")
+                                        // Reset deck when toggling to ensure fresh randomization
+                                        if !$0 {
+                                            print("🎲 Force 10s DISABLED - Resetting deck for fresh randomization")
+                                        }
+                                    }
                                 ))
                                 .labelsHidden()
                             }

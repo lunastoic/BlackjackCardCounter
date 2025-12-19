@@ -94,6 +94,37 @@ struct Card: Identifiable, Equatable {
         return "\(rankString)Of\(suitString)"
     }
     
+    func imageName(isTrainingMode: Bool) -> String {
+        if !isFaceUp {
+            return "DeckCover"
+        }
+        return faceImageName(isTrainingMode: isTrainingMode)
+    }
+    
+    /// Returns the face image name regardless of `isFaceUp`.
+    /// Used for flip animations where `isFlipped` controls visibility.
+    func faceImageName(isTrainingMode: Bool) -> String {
+        let rankString: String
+        switch rank {
+        case .ace: rankString = "Ace"
+        case .jack: rankString = "Jack"
+        case .queen: rankString = "Queen"
+        case .king: rankString = "King"
+        default: rankString = "\(rank.rawValue)"
+        }
+        
+        let suitString: String
+        switch suit {
+        case .spades: suitString = "Spades"
+        case .hearts: suitString = "Hearts"
+        case .diamonds: suitString = "Diamonds"
+        case .clubs: suitString = "Clubs"
+        }
+        
+        let baseName = "\(rankString)Of\(suitString)"
+        return isTrainingMode ? "T_\(baseName)" : baseName
+    }
+    
     var countValue: Int {
         rank.countValue
     }

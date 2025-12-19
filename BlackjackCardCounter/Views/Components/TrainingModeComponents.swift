@@ -2,51 +2,7 @@ import SwiftUI
 
 // MARK: - Training Mode Specific Components
 
-// MARK: - Card Count Meter
-struct CardCountMeter: View {
-    let runningCount: Int
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Text("Card Counter Meter")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color.red, Color.yellow, Color.green]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ))
-                    .frame(height: 24)
-                
-                GeometryReader { geo in
-                    let width = geo.size.width
-                    let minCount = -10.0
-                    let maxCount = 10.0
-                    let clamped = Double(runningCount).clamped(to: minCount...maxCount)
-                    let normalized = (clamped - minCount) / (maxCount - minCount) // 0 to 1
-                    let xOffset = CGFloat(normalized) * (width - 48) // 48 = width of number label
-                    
-                    Text("\(runningCount)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .frame(width: 48, height: 32)
-                        .background(Color.white.opacity(0.85))
-                        .cornerRadius(12)
-                        .offset(x: xOffset)
-                        .shadow(radius: 4)
-                }
-                .frame(height: 32)
-            }
-            .frame(height: 32)
-            .padding(.horizontal)
-        }
-        .padding(.horizontal)
-    }
-}
+// Note: CardCountMeter moved to CardCounterMeterTM.swift
 
 // MARK: - Bar Chart View
 struct BarChartView: View {
@@ -189,38 +145,7 @@ struct LegendCell: View {
     }
 }
 
-// MARK: - Achievement Model and Progress Bar
-struct Achievement: Identifiable {
-    let id = UUID()
-    let title: String
-    let description: String
-    let current: Int
-    let goal: Int
-    var isComplete: Bool { current >= goal }
-}
-
-struct AchievementProgressBar: View {
-    let progress: Double // 0.0 to 1.0
-    
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.gray.opacity(0.25))
-                    .frame(height: 10)
-                
-                Capsule()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color.green, Color.yellow]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ))
-                    .frame(width: geo.size.width * progress, height: 10)
-            }
-        }
-        .frame(height: 10)
-    }
-}
+// Note: Achievement model and AchievementProgressBar moved to GameAchievements.swift
 
 // MARK: - Clamp Extension
 extension Double {
