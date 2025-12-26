@@ -101,6 +101,7 @@ struct TrainingModeFlipCardView: View {
         case .hearts: suitString = "Hearts"
         case .diamonds: suitString = "Diamonds"
         case .clubs: suitString = "Clubs"
+        @unknown default: suitString = "Clubs"
         }
         
         // Always use T_ prefix for training mode
@@ -144,7 +145,7 @@ struct TrainingModeFlipCardView: View {
             return Color(red: 0.0, green: 1.0, blue: 0.0) // Vibrant neon green
         case .seven, .eight, .nine:
             return Color(red: 0.3, green: 0.3, blue: 0.3) // Darker neon gray
-        default:
+        @unknown default:
             return Color.clear
         }
     }
@@ -211,7 +212,7 @@ struct TrainingModeCardView: View {
             return Color(red: 0.0, green: 1.0, blue: 0.0) // Vibrant neon green
         case .seven, .eight, .nine:
             return Color(red: 0.3, green: 0.3, blue: 0.3) // Darker neon gray
-        default:
+        @unknown default:
             return Color.clear
         }
     }

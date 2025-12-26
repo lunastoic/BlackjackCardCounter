@@ -689,7 +689,7 @@ class BlackjackGameEngine: ObservableObject {
                         card.rank.value == 10
                     }
                     
-                    if let (index, tenCard) = availableTens.first {
+                    if let (index, _) = availableTens.first {
                         card = localDeck.remove(at: index)
                         print("🎲 Debug: Forced dealer to draw 10-value card: \(card.rank.rawValue) (current: \(currentValue) -> new: \(currentValue + 10))")
                     } else {
@@ -700,12 +700,12 @@ class BlackjackGameEngine: ObservableObject {
                             return cardValue >= targetValue
                         }
                         
-                        if let (index, bustCard) = availableCards.first {
+                        if let (index, _) = availableCards.first {
                             card = localDeck.remove(at: index)
                             print("🎲 Debug: Forced dealer to bust with \(card.rank.rawValue) (value: \(card.rank.value))")
                         } else {
                             // Get the highest value card available
-                            if let (index, highCard) = localDeck.enumerated().max(by: { $0.1.rank.value < $1.1.rank.value }) {
+                            if let (index, _) = localDeck.enumerated().max(by: { $0.1.rank.value < $1.1.rank.value }) {
                                 card = localDeck.remove(at: index)
                                 print("🎲 Debug: No bust card available, using highest: \(card.rank.rawValue)")
                             } else {
@@ -1243,7 +1243,7 @@ class BlackjackGameEngine: ObservableObject {
     // MARK: - Dealer hole reveal
     func revealDealerCard(gameState: BlackjackGameState, completion: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.easeInOut(duration: 0.6)) { gameState.flippedDealerCards.insert(0) }
+            _ = withAnimation(.easeInOut(duration: 0.6)) { gameState.flippedDealerCards.insert(0) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 // Update counting state after flip animation completes
                 gameState.countingRevealedDealerCards.insert(0)

@@ -19,9 +19,6 @@ struct BlackjackBettingView: View {
         !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
     }
     
-    private var handInProgress: Bool {
-        gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
-    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -75,13 +72,11 @@ struct BlackjackBettingView: View {
                                 .offset(x: xOffset, y: yOffset)
                                 .zIndex(20000 + Double(index)) // force overlay above chips
                                 .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1) // Hide with opacity instead of removing
-                                .animation(.none) // Disable any implicit animations - chips should just pop up
                                 .transition(.identity) // No transition animations
                                 .transaction { $0.animation = nil } // Completely disable all animations
                                 .allowsHitTesting(false) // Disable interaction with betting chips
                         }
                     }
-                    .animation(.none) // Disable animations on the entire ZStack
                     .transaction { $0.animation = nil } // Completely disable all animations
                     .offset(y: !gameState.betChips.isEmpty ? 10 : 0) // Move down 10 points when chips are placed
                     .background(
@@ -131,12 +126,10 @@ struct BlackjackBettingView: View {
                                     .offset(x: xOffset, y: yOffset)
                                     .zIndex(20000 + Double(index))
                                     .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1) // Hide with opacity instead of removing
-                                    .animation(.none) // Disable any implicit animations - chips should just pop up
                                     .transition(.identity) // No transition animations
                                     .transaction { $0.animation = nil } // Completely disable all animations
                             }
                         }
-                        .animation(.none) // Disable animations on the entire ZStack
                         .transaction { $0.animation = nil } // Completely disable all animations
                         .offset(x: 60) // Same distance as payout animation (60 points right)
                         .onAppear {
@@ -177,7 +170,7 @@ struct BlackjackBettingView: View {
                 
                 // Win/Lose/Push message - text in yellow, numbers in green/red
                 // Works for both splits and non-splits
-                if let result = gameState.resultMessage, gameState.showResultNotification {
+                if gameState.resultMessage != nil, gameState.showResultNotification {
                     if gameState.lastPayout > 0 {
                         // Win: text yellow, number green
                         HStack(spacing: 2) {
@@ -211,7 +204,6 @@ struct BlackjackBettingView: View {
             }
         }
         .padding(.top, -10) // Negative padding to eliminate gap
-        .animation(.none) // Disable all implicit animations - chips should just pop up
         .transaction { $0.animation = nil } // Completely disable all animations
         .allowsHitTesting(true) // Keep hit testing enabled for the betting area
         .disableDynamicType()
@@ -282,7 +274,6 @@ struct ChipSelectionView: View {
                 )
             }
         }
-        .animation(.none) // Disable animations on the entire VStack
         .transaction { $0.animation = nil } // Completely disable all animations
         // Keep chip selection fixed; otherwise it jumps when bet chips auto-collect/clear.
         .offset(y: 0)
@@ -318,7 +309,7 @@ struct DealNextHandButtons: View {
     let gameEngine: BlackjackGameEngine
     let bettingManager: BlackjackBettingManager
     var animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
-
+    
     // ALWAYS show buttons when chip selection is visible - no other conditions
     private var shouldShowButtons: Bool {
         // Show when chip selection is visible OR results are showing
@@ -346,10 +337,10 @@ struct DealNextHandButtons: View {
     private var dealerTurnInProgress: Bool {
         gameState.showNextHand && !gameState.dealerHand.isEmpty && !gameState.isPlayerTurn && !gameState.isDealing
     }
-
+    
     var body: some View {
         if shouldShowButtons && !isActiveGameplay && !dealerTurnInProgress {
-            HStack(spacing: 16) {
+                HStack(spacing: 16) {
                 if gameState.lastBet != nil {
                     Button(action: {
                         bettingManager.redoBet(gameState: gameState)
@@ -376,7 +367,7 @@ struct DealNextHandButtons: View {
                     gameState.additionalBetChips = []
                     gameState.doubleDownChipsHand1 = []
                     gameState.doubleDownChipsHand2 = []
-
+                    
                     let originalBet = gameState.playerBet
                     gameState.betChips = []
                     var remaining = originalBet
@@ -387,29 +378,29 @@ struct DealNextHandButtons: View {
                             remaining -= denom
                         }
                     }
-
+                    
                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                     if trainingModeEnabled {
                         gameState.resultMessage = nil
                         gameState.showPostGameButtons = false
                         gameState.showResultNotification = true
                     }
-
+                    
                     let useRegularAnimation = gameState.deckPosition != .zero
                     gameEngine.dealInitialCards(
-                        gameState: gameState,
+                        gameState: gameState, 
                         useRegularModeAnimation: useRegularAnimation,
                         animationCallback: animationCallback
                     )
                 }) {
-                    ZStack {
+                        ZStack {
                         Image("DealButton2")
                             .renderingMode(.original)
                             .resizable()
                             .scaledToFit()
                             .frame(width: 150, height: 60)
                             .colorMultiply(hasPlacedChip ? Color.white : Color.gray)
-                            .saturation(dealButtonSaturation)
+                                .saturation(dealButtonSaturation)
                         Text("Deal Cards")
                             .font(.fixedSystem(size: 20, weight: .bold))
                             .foregroundColor(.white)

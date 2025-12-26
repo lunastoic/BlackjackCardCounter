@@ -5,6 +5,7 @@ import UIKit
 struct MapCarouselView: View {
     let maps: [Map]
     @Binding var selectedIndex: Int
+    @Binding var unlockingMapID: Int?
     let onUnlock: (Map) -> Void
     
     @ObservedObject private var xpManager = XPChipManager.shared
@@ -17,6 +18,7 @@ struct MapCarouselView: View {
                     maps: maps,
                     selectedIndex: $selectedIndex,
                     unlockedMaps: unlockedMaps,
+                    unlockingMapID: $unlockingMapID,
                     xpManager: xpManager,
                     onUnlock: onUnlock
                 )
@@ -25,6 +27,7 @@ struct MapCarouselView: View {
                     maps: maps,
                     selectedIndex: $selectedIndex,
                     unlockedMaps: unlockedMaps,
+                    unlockingMapID: $unlockingMapID,
                     xpManager: xpManager,
                     onUnlock: onUnlock
                 )
@@ -53,6 +56,7 @@ private struct iOS17CarouselView: UIViewRepresentable {
     let maps: [Map]
     @Binding var selectedIndex: Int
     let unlockedMaps: String
+    @Binding var unlockingMapID: Int?
     let xpManager: XPChipManager
     let onUnlock: (Map) -> Void
     
@@ -83,6 +87,7 @@ private struct iOS17CarouselView: UIViewRepresentable {
                 maps: maps,
                 selectedIndex: selectedIndex,
                 unlockedMaps: unlockedMaps,
+                unlockingMapID: $unlockingMapID,
                 xpManager: xpManager,
                 onUnlock: onUnlock
             )
@@ -146,6 +151,7 @@ private struct iOS17CarouselView: UIViewRepresentable {
         
         private var maps: [Map] = []
         private var unlockedMaps: String = ""
+        private var unlockingMapID: Binding<Int?>?
         private var xpManager: XPChipManager?
         private var onUnlock: ((Map) -> Void)?
         private var targetTimer: Timer?
@@ -159,11 +165,13 @@ private struct iOS17CarouselView: UIViewRepresentable {
             maps: [Map],
             selectedIndex: Int,
             unlockedMaps: String,
+            unlockingMapID: Binding<Int?>,
             xpManager: XPChipManager,
             onUnlock: @escaping (Map) -> Void
         ) {
             self.maps = maps
             self.unlockedMaps = unlockedMaps
+            self.unlockingMapID = unlockingMapID
             self.xpManager = xpManager
             self.onUnlock = onUnlock
         }
@@ -182,6 +190,7 @@ private struct iOS17CarouselView: UIViewRepresentable {
                 map: map,
                 isSelected: isSelected,
                 unlockedMaps: unlockedMaps,
+                unlockingMapID: unlockingMapID,
                 xpManager: xpManager,
                 onTap: { [weak self] in
                     self?.selectedIndex.wrappedValue = indexPath.item
@@ -300,6 +309,7 @@ private struct iOS16CarouselView: UIViewRepresentable {
     let maps: [Map]
     @Binding var selectedIndex: Int
     let unlockedMaps: String
+    @Binding var unlockingMapID: Int?
     let xpManager: XPChipManager
     let onUnlock: (Map) -> Void
     
@@ -330,6 +340,7 @@ private struct iOS16CarouselView: UIViewRepresentable {
                 maps: maps,
                 selectedIndex: selectedIndex,
                 unlockedMaps: unlockedMaps,
+                unlockingMapID: $unlockingMapID,
                 xpManager: xpManager,
                 onUnlock: onUnlock
             )
@@ -393,6 +404,7 @@ private struct iOS16CarouselView: UIViewRepresentable {
         
         private var maps: [Map] = []
         private var unlockedMaps: String = ""
+        private var unlockingMapID: Binding<Int?>?
         private var xpManager: XPChipManager?
         private var onUnlock: ((Map) -> Void)?
         private var targetTimer: Timer?
@@ -406,11 +418,13 @@ private struct iOS16CarouselView: UIViewRepresentable {
             maps: [Map],
             selectedIndex: Int,
             unlockedMaps: String,
+            unlockingMapID: Binding<Int?>,
             xpManager: XPChipManager,
             onUnlock: @escaping (Map) -> Void
         ) {
             self.maps = maps
             self.unlockedMaps = unlockedMaps
+            self.unlockingMapID = unlockingMapID
             self.xpManager = xpManager
             self.onUnlock = onUnlock
         }
@@ -429,6 +443,7 @@ private struct iOS16CarouselView: UIViewRepresentable {
                 map: map,
                 isSelected: isSelected,
                 unlockedMaps: unlockedMaps,
+                unlockingMapID: unlockingMapID,
                 xpManager: xpManager,
                 onTap: { [weak self] in
                     self?.selectedIndex.wrappedValue = indexPath.item
@@ -550,6 +565,7 @@ final class MapCardCell: UICollectionViewCell {
         map: Map,
         isSelected: Bool,
         unlockedMaps: String,
+        unlockingMapID: Binding<Int?>?,
         xpManager: XPChipManager?,
         onTap: @escaping () -> Void,
         onUnlock: @escaping () -> Void
@@ -563,6 +579,7 @@ final class MapCardCell: UICollectionViewCell {
             map: map,
             isSelected: isSelected,
             unlockedMaps: unlockedMaps,
+            unlockingMapID: unlockingMapID,
             xpManager: xpManager ?? XPChipManager.shared,
             onTap: onTap,
             unlockAction: onUnlock

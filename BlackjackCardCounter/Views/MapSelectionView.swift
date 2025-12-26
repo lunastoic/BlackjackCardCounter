@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MapSelectionView: View {
     @State private var selectedIndex: Int = 0
+    @State private var unlockingMapID: Int? = nil // Track which map is currently unlocking
     @ObservedObject private var xpManager = XPChipManager.shared
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // 1 is always unlocked
     
@@ -55,6 +56,7 @@ struct MapSelectionView: View {
                                     }
                                 }
                             ),
+                            unlockingMapID: $unlockingMapID,
                             onUnlock: { map in
                                 if xpManager.userLevel >= map.requiredLevel {
                                     unlockMap(map)
@@ -71,6 +73,7 @@ struct MapSelectionView: View {
                         MapCarouselView(
                             maps: maps,
                             selectedIndex: $selectedIndex,
+                            unlockingMapID: $unlockingMapID,
                             onUnlock: { map in
                                 if xpManager.userLevel >= map.requiredLevel {
                                     unlockMap(map)
@@ -115,15 +118,17 @@ struct MapCard: View {
     let map: Map
     let isSelected: Bool
     let unlockedMaps: String
+    var unlockingMapID: Binding<Int?>? = nil // Managed by parent to survive re-renders
     @ObservedObject var xpManager: XPChipManager
     let onTap: () -> Void
     let unlockAction: () -> Void
 
     @State private var isUnlocking = false
     @State private var wasUnlocked = false
-    @State private var showUnlockIcon = false
     @State private var localUnlocked = false
     @State private var isShaking = false
+    @State private var showUnlockAsset = false // Still used for local state if binding not provided
+    @State private var unlockInProgress = false // Separate flag to prevent multiple taps
 
     // For crisp hairline borders scaled to device pixels
     @Environment(\.displayScale) private var displayScale
@@ -235,20 +240,22 @@ struct MapCard: View {
                     .allowsHitTesting(false)
             }
             
-            if !unlocked || isUnlocking {
-                // Locked state: full-bleed image + dark overlay + lock button
+            // Keep the locked overlay visible either while still locked OR while we are showing the unlock asset.
+            // Drop isUnlocking from the condition so the unlock asset never disappears mid-transition.
+            // Keep overlay visible if: we're showing unlock asset OR map is still locked
+            // CRITICAL: showUnlockAsset takes absolute priority - if true, overlay MUST stay visible
+            if showUnlockAsset || (unlockingMapID?.wrappedValue == map.id) || !unlocked {
+                // Locked state: full-bleed image + dark overlay + lock/unlock swap
                 Image(map.imageName)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .clipped()
-                    .opacity(isUnlocking ? 0 : 1) // Fade out background image during unlock
-                    .animation(.easeInOut(duration: 0.5), value: isUnlocking)
+                    .opacity(1)
 
                 RoundedRectangle(cornerRadius: 32)
-                    .fill(Color.black.opacity(isUnlocking ? 0 : 0.5))
-                    .allowsHitTesting(false) // overlay is visual only; don't block taps
-                    .animation(.easeInOut(duration: 0.5), value: isUnlocking)
-                    .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: 0) // White exterior glow for locked cards
+                    .fill(Color.black.opacity(0.5))
+                    .allowsHitTesting(false)
+                    .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: 0)
 
                 VStack(spacing: 10) {
                     Spacer()
@@ -259,49 +266,86 @@ struct MapCard: View {
                             .fill(Color.red.opacity(0.0))
                             .frame(width: 162, height: 162)
                         
-                        Image(showUnlockIcon ? "unlock" : "Lock")
+                        // Simple direct replacement: show unlock OR lock, not both
+                        // Use both local state and parent-managed state to ensure it survives re-renders
+                        if showUnlockAsset || (unlockingMapID?.wrappedValue == map.id) {
+                            Image("unlock")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 162, height: 162)
-                        .opacity(isUnlocking ? 0 : 1)
-                            .scaleEffect(isUnlocking ? 1.5 : 1)
+                                .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0)
+                                .transaction { $0.animation = nil }
+                        } else {
+                            Image("Lock")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 162, height: 162)
                             .offset(x: isShaking ? 8 : 0)
-                            .animation(.easeInOut(duration: 0.3), value: isUnlocking)
-                            .animation(.easeInOut(duration: 0.15).repeatCount(3, autoreverses: true), value: isShaking)
-                            .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0) // Brighter white glow behind the lock asset
+                                .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0)
+                                .transaction { $0.animation = nil }
+                        }
                     }
                     .frame(width: 162, height: 162)
                     .background(Color.blue.opacity(0.0)) // Invisible debug indicator
                     .contentShape(Rectangle()) // Ensure entire area is tappable
+                    .zIndex(2000)
                     .onTapGesture {
+                        // BULLETPROOF: Prevent ANY interaction during unlock process
+                        guard !unlockInProgress else { return }
                         guard !isUnlocking else { return }
-                        guard !showUnlockIcon else { return }
+                        guard !showUnlockAsset else { return }
                         
                         if xpManager.userLevel >= map.requiredLevel {
-                            // Show the "unlock" asset briefly, then reveal buttons
-                            showUnlockIcon = true
+                            // CRITICAL: Set ALL flags immediately to prevent any other taps
+                            unlockInProgress = true
+                            showUnlockAsset = true
+                            unlockingMapID?.wrappedValue = map.id // Set parent-managed state
+                            isUnlocking = true
 
-                            // Wait 0.6s, then start fade transition
+                            // Hold unlock asset for 0.6s, then unlock the map
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                // Prepare unlocked state immediately (like removing a blanket)
-                                unlockAction()      // persist to AppStorage
-                                localUnlocked = true
-                                
-                                // Start fade out animation to reveal the unlocked card underneath
-                                withAnimation(.easeInOut(duration: 0.6)) {
-                                    showUnlockIcon = false
-                                    isUnlocking = true
+                                // CRITICAL: Re-confirm flags are still set
+                                if !showUnlockAsset || !unlockInProgress {
+                                    // Something reset them - restore immediately
+                                    showUnlockAsset = true
+                                    unlockingMapID?.wrappedValue = map.id
+                                    unlockInProgress = true
                                 }
                                 
-                                // After fade completes, the unlocked card is already visible
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                    isUnlocking = false  // Complete the transition
+                                // Unlock the map
+                                unlockAction()
+                                localUnlocked = true
+                                
+                                // CRITICAL: Force unlock asset to stay visible - set it again
+                                showUnlockAsset = true
+                                unlockingMapID?.wrappedValue = map.id
+                                unlockInProgress = true
+                                
+                                // Keep unlock asset visible as map reveals - don't reset isUnlocking yet
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    // Re-confirm unlock asset is still showing
+                                    showUnlockAsset = true
+                                    unlockingMapID?.wrappedValue = map.id
+                                    unlockInProgress = true
+                                    isUnlocking = false
+                                }
+                                
+                                // Keep unlock asset visible for full reveal (0.4 second after unlock, total 1.0s from tap)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    // Only reset AFTER map is fully revealed
+                                    showUnlockAsset = false
+                                    if unlockingMapID?.wrappedValue == map.id {
+                                        unlockingMapID?.wrappedValue = nil
+                                    }
+                                    unlockInProgress = false
                                 }
                             }
                         } else {
-                            // Shake the lock to indicate insufficient level
-                            isShaking = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            // Shake the lock to indicate insufficient level (left-right "no")
+                            withAnimation(.easeInOut(duration: 0.07).repeatCount(5, autoreverses: true)) {
+                                isShaking = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                 isShaking = false
                             }
                         }
@@ -980,38 +1024,39 @@ struct MapCard: View {
         .clipShape(RoundedRectangle(cornerRadius: (map.name == "Luna Luxe Casino" || map.name == "Io Inferno Lounge" || map.name == "Europa Ice Palace" || map.name == "Titan Methane Mirage" || map.name == "Ganymede Grand" || map.name == "Kepler Fortune") ? 12 : 32))
         .overlay(
             // Max bet text for all maps - positioned as overlay to not affect title
+            // Only show when map is fully unlocked AND unlock asset is not showing
             Group {
-                if unlocked && map.name == "Luna Luxe Casino" {
+                if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Luna Luxe Casino" {
                     Text("Max bet: $1000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .offset(y: -17)
-                } else if unlocked && map.name == "Io Inferno Lounge" {
+                } else if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Io Inferno Lounge" {
                     Text("Max bet: $5000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .offset(y: -17)
-                } else if unlocked && map.name == "Europa Ice Palace" {
+                } else if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Europa Ice Palace" {
                     Text("Max bet: $10,000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .offset(y: -17)
-                } else if unlocked && map.name == "Ganymede Grand" {
+                } else if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Ganymede Grand" {
                     Text("Max bet: $50,000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .offset(y: -17)
-                } else if unlocked && map.name == "Titan Methane Mirage" {
+                } else if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Titan Methane Mirage" {
                     Text("Max bet: $250,000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .offset(y: -17)
-                } else if unlocked && map.name == "Kepler Fortune" {
+                } else if unlocked && !showUnlockAsset && unlockingMapID?.wrappedValue != map.id && map.name == "Kepler Fortune" {
                     Text("Max bet: $1,000,000")
                         .font(.fixedSystem(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
@@ -1027,14 +1072,34 @@ struct MapCard: View {
                 onTap()
             }
         })
-        .onAppear { wasUnlocked = unlocked }
+        .onAppear { 
+            // Preserve state during unlock transition; just capture current unlocked state
+            wasUnlocked = unlocked
+            // Don't reset showUnlockAsset on appear - let the unlock process handle it
+        }
         .onChange(of: unlocked) { newValue in
-            if newValue && !wasUnlocked {
-                isUnlocking = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    isUnlocking = false
+            // CRITICAL: If unlockInProgress is true, tap handler owns everything - DO ABSOLUTELY NOTHING
+            if unlockInProgress {
+                // Tap handler is in control - do NOTHING, don't touch ANY state
+                wasUnlocked = newValue
+                return
+            }
+            
+            // Only handle external unlocks (not from tap)
+            if newValue && !wasUnlocked && !unlockInProgress {
+                // External unlock - handle it
+                unlockInProgress = true
+                showUnlockAsset = true
+                unlockingMapID?.wrappedValue = map.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    showUnlockAsset = false
+                    if unlockingMapID?.wrappedValue == map.id {
+                        unlockingMapID?.wrappedValue = nil
+                    }
+                    unlockInProgress = false
                 }
             }
+            
             // Sync local with AppStorage so the card stays unlocked after reload
             let appStorageUnlocked = unlockedMaps.split(separator: ",").compactMap { Int($0) }.contains(map.id)
             if appStorageUnlocked { localUnlocked = true }

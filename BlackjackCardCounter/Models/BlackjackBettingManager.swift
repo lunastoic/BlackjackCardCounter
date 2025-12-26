@@ -59,12 +59,10 @@ class BlackjackBettingManager: ObservableObject {
             XPChipManager.shared.updateChips(-chipValue)
             
             // Clear win/lose notification when chip is placed (both training and regular mode)
-            let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-            let isTrainingMode = gameState.isTrainingMode
-            print("🎓 Training Mode Check: trainingModeEnabled=\(trainingModeEnabled), isTrainingMode=\(isTrainingMode), resultMessage=\(gameState.resultMessage ?? "nil")")
+            print("🎓 Training Mode Check: resultMessage=\(gameState.resultMessage ?? "nil")")
             
             if gameState.resultMessage != nil {
-                print("🎯 CLEARING NOTIFICATION: result=\(gameState.resultMessage ?? "nil"), lastPayout=\(gameState.lastPayout)")
+                print("🎯 CLEARING NOTIFICATION: result=\(String(describing: gameState.resultMessage)), lastPayout=\(gameState.lastPayout)")
                 print("🎯 Clearing result notification when chip is placed (both modes)")
                 gameState.showResultNotification = false
                 gameState.resultMessage = nil
@@ -74,7 +72,7 @@ class BlackjackBettingManager: ObservableObject {
             if !gameState.dealtPlayerCards.isEmpty {
                 print("🎯 Starting card collection animation when chip is placed")
                 print("🎯 Betting state before animation: playerBet=\(gameState.playerBet), betChips=\(gameState.betChips)")
-                print("🎯 Betting state before animation: resultMessage=\(gameState.resultMessage), showResultNotification=\(gameState.showResultNotification)")
+                print("🎯 Betting state before animation: resultMessage=\(String(describing: gameState.resultMessage)), showResultNotification=\(gameState.showResultNotification)")
                 animateCardsBackToDeck(gameState: gameState)
             }
             
@@ -163,8 +161,6 @@ class BlackjackBettingManager: ObservableObject {
         gameState.userPlacedCurrentBet = true
         
         // Clear win/lose notification when redo bet is used (both training and regular mode)
-        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-        let isTrainingMode = gameState.isTrainingMode
         if gameState.resultMessage != nil {
             print("🎯 Clearing result notification when redo bet is used (both modes)")
             gameState.showResultNotification = false
@@ -175,7 +171,7 @@ class BlackjackBettingManager: ObservableObject {
         if !gameState.dealtPlayerCards.isEmpty {
             print("🎯 Starting card collection animation when redo bet is used")
             print("🎯 Betting state before animation: playerBet=\(gameState.playerBet), betChips=\(gameState.betChips)")
-            print("🎯 Betting state before animation: resultMessage=\(gameState.resultMessage), showResultNotification=\(gameState.showResultNotification)")
+            print("🎯 Betting state before animation: resultMessage=\(String(describing: gameState.resultMessage)), showResultNotification=\(gameState.showResultNotification)")
             animateCardsBackToDeck(gameState: gameState)
         }
     }
@@ -301,7 +297,7 @@ class BlackjackBettingManager: ObservableObject {
             ) {
                 print("🎯 All card collection animation completed")
                 print("🎯 Betting state after animation: playerBet=\(gameState.playerBet), betChips=\(gameState.betChips)")
-                print("🎯 Betting state after animation: resultMessage=\(gameState.resultMessage), showResultNotification=\(gameState.showResultNotification)")
+                print("🎯 Betting state after animation: resultMessage=\(String(describing: gameState.resultMessage)), showResultNotification=\(gameState.showResultNotification)")
                 print("🎯 Betting state after animation: isCollectingPhase=\(gameState.isCollectingPhase)")
                 print("🎯 Betting state after animation: showNextHand=\(gameState.showNextHand), showPostGameButtons=\(gameState.showPostGameButtons)")
                 print("🎯 Betting state after animation: isPlayerTurn=\(gameState.isPlayerTurn), isProcessingAction=\(gameState.isProcessingAction)")

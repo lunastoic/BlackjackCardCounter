@@ -58,7 +58,6 @@ struct BlackjackActionButtons: View {
                 color2: "6dd5ed",
                 isEnabled: {
                     let canSplit = gameState.canSplit && !gameState.isProcessingAction
-                    let handRanks = gameState.playerHand.map { $0.rank.rawValue }
                     print("🃏 Split button check: canSplit=\(gameState.canSplit), processing=\(gameState.isProcessingAction), final=\(canSplit)")
                     return canSplit
                 }(),

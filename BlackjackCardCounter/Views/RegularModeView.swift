@@ -254,7 +254,6 @@ struct RegularModeView: View {
                         
                         let isSplit = gameState.isSplit
                         let hand1Doubled = isSplit && !gameState.doubleDownChipsHand1.isEmpty
-                        let hand2Doubled = isSplit && !gameState.doubleDownChipsHand2.isEmpty
                         
                         ZStack {
                             if isSplit {
@@ -304,7 +303,7 @@ struct RegularModeView: View {
                         .frame(height: 60)
                         .frame(maxWidth: .infinity)
                         .animation(.none, value: gameState.isSplit)
-                        .transaction { $0.animation = nil }
+                            .transaction { $0.animation = nil }
                         // Capture on-table chip row position for payout animations (global coordinates).
                         .background(
                             GeometryReader { geometry in
@@ -361,20 +360,20 @@ struct RegularModeView: View {
                         
                         // Win/Lose/Push Notifications - Fixed height to prevent layout shifts
                         Group {
-                            if let result = gameState.resultMessage, gameState.showResultNotification {
-                                if gameState.lastPayout > 0 {
-                                    Text("Win $\(gameState.actualWinnings)")
-                                        .font(.fixedSystem(size: 16, weight: .bold))
-                                        .foregroundColor(.green)
-                                } else if gameState.lastPayout < 0 {
-                                    Text("Lose $\(abs(gameState.actualWinnings))")
-                                        .font(.fixedSystem(size: 16, weight: .bold))
-                                        .foregroundColor(.red)
-                                } else {
-                                    Text("Push $\(gameState.actualWinnings)")
-                                        .font(.fixedSystem(size: 16, weight: .bold))
-                                        .foregroundColor(.green)
-                                }
+                        if gameState.resultMessage != nil, gameState.showResultNotification {
+                            if gameState.lastPayout > 0 {
+                                Text("Win $\(gameState.actualWinnings)")
+                                    .font(.fixedSystem(size: 16, weight: .bold))
+                                    .foregroundColor(.green)
+                            } else if gameState.lastPayout < 0 {
+                                Text("Lose $\(abs(gameState.actualWinnings))")
+                                    .font(.fixedSystem(size: 16, weight: .bold))
+                                    .foregroundColor(.red)
+                            } else {
+                                Text("Push $\(gameState.actualWinnings)")
+                                    .font(.fixedSystem(size: 16, weight: .bold))
+                                    .foregroundColor(.green)
+                            }
                             } else {
                                 // Reserve space even when notification is not shown to prevent layout shifts
                                 Text("")
@@ -783,7 +782,6 @@ struct RegularModeView: View {
                     .offset(x: xOffset, y: yOffset)
                     .zIndex(Double(index))
                     .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
-                    .animation(.none)
                     .transition(.identity)
                     .transaction { $0.animation = nil }
                     .allowsHitTesting(false)
@@ -871,7 +869,7 @@ struct RegularModeView: View {
             // Extract hand label (e.g., "Hand 1: " or "Hand 2: ")
             if let colonIndex = line.firstIndex(of: ":") {
                 let handLabel = String(line[..<colonIndex]) + ": "
-                let result = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+                let resultText = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
                 
                 // Hand label in yellow
                 Text(handLabel)
@@ -879,9 +877,9 @@ struct RegularModeView: View {
                     .foregroundColor(.yellow)
                 
                 // Result in appropriate color
-                Text(result)
+                Text(resultText)
                     .font(.title2).fontWeight(.bold)
-                    .foregroundColor(colorForSplitHandResult(result))
+                    .foregroundColor(colorForSplitHandResult(resultText))
             } else {
                 // Fallback if no colon found
                 Text(line)

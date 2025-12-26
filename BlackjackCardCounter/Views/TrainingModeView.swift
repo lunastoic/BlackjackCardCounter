@@ -40,7 +40,7 @@ struct TrainingModeView: View {
         let hand2DDXOffset: CGFloat
         let hand1DDXOffset: CGFloat
     }
-
+    
     // MARK: - Chip Stack Rendering Helpers (reduce SwiftUI type-check complexity)
     private let chipSize: CGFloat = 44.0
     private let chipSpacing: CGFloat = 45.0 // chipSize (44) + 1
@@ -70,7 +70,6 @@ struct TrainingModeView: View {
                     .offset(x: offs.x, y: offs.y)
                     .zIndex(20000 + Double(index))
                     .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
-                    .animation(.none)
                     .transition(.identity)
                     .transaction { $0.animation = nil }
                     .allowsHitTesting(false)
@@ -85,15 +84,16 @@ struct TrainingModeView: View {
         // Only apply a small +7pt nudge while payout chips are being shown/animated.
         let hand2Doubled = !gameState.doubleDownChipsHand2.isEmpty
         let hand1Doubled = !gameState.doubleDownChipsHand1.isEmpty
-        let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
+        let _ = gameState.lastPayout > 0 && gameState.showResultNotification
         let hasRegularDD = !gameState.isSplit && !gameState.additionalBetChips.isEmpty
         let regularUserStackCount: Int = hasRegularDD ? 2 : 1
-        let regularPayoutCount: Int = hasPayoutChips ? (hasRegularDD ? 2 : 1) : 0
+        let regularPayoutCount: Int = (gameState.lastPayout > 0 && gameState.showResultNotification) ? (hasRegularDD ? 2 : 1) : 0
         let regularTotalCount: Int = regularUserStackCount + regularPayoutCount
         
         // When payout chips are present (while payout chips are animating / placed),
         // shift BOTH stacks per hand slightly right to make room on the left.
         // Tuned so the 2 payout chips per hand fit cleanly on the left.
+        let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
         let payoutOffset: CGFloat = hasPayoutChips ? 36.0 : 0.0
         
         // Non-split: treat the payout+user stacks as one touching row that stays centered.
@@ -111,7 +111,7 @@ struct TrainingModeView: View {
         
         // In split: Hand 1 bet stack on the right.
         // In non-split: additionalBetChips represents the double-down stack; it should touch the LEFT of the main bet stack.
-        let hand1BetXOffset: CGFloat = gameState.isSplit ?
+        let hand1BetXOffset: CGFloat = gameState.isSplit ? 
             (70.0 + (hand1Doubled ? 10.0 : 0.0) + payoutOffset + hand1GroupTweak) :
             (hasRegularDD ? nonSplitFirstUserX : 0.0)
         
@@ -331,10 +331,8 @@ struct TrainingModeView: View {
                 
                 // Player and Dealer cards area (offset to match RegularModeView positioning)
                 GeometryReader { geo in
-                    let maxPlayerCards = max(gameState.dealtPlayerCards.count, gameState.isSplit ? gameState.splitHands.flatMap { $0 }.count : 2)
-                    let maxDealerCards = max(gameState.dealtDealerCards.count, 2)
-                    let maxCards = max(maxPlayerCards, maxDealerCards)
-                    let cardWidth: CGFloat = 60 // Fixed card width to prevent layout shifts
+                    let _ = max(max(gameState.dealtPlayerCards.count, gameState.isSplit ? gameState.splitHands.flatMap { $0 }.count : 2), max(gameState.dealtDealerCards.count, 2))
+                    let _: CGFloat = 60 // Fixed card width to prevent layout shifts
                     
                     // Update table size when geometry changes
                     let _ = DispatchQueue.main.async {
@@ -440,9 +438,6 @@ struct TrainingModeView: View {
                         if UIDevice.current.userInterfaceIdiom == .pad {
                             Spacer().frame(height: CardMetrics.extraSpacerHeight(isIPad: true))
                         }
-                        
-                        // Get training mode status
-                        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                         
                         // Shuffling notification is now handled as overlay - removed from here
                         
@@ -625,7 +620,6 @@ struct TrainingModeView: View {
                         y: gameState.dealtPlayerCards.isEmpty && gameState.dealtDealerCards.isEmpty ? 360 : 360
                     )
                     .offset(y: -10) // Shift up by 10 points total (5 + 5)
-                    .animation(.none) // No animations
                     .zIndex(10000) // Highest z-index
                 
                 // Yellow number - completely isolated from card animations (only show for non-split hands)
@@ -639,7 +633,6 @@ struct TrainingModeView: View {
                             y: gameState.dealtPlayerCards.isEmpty && gameState.dealtDealerCards.isEmpty ? 390 : 390
                         )
                         .offset(y: -10) // Shift up by 10 points total (5 + 5)
-                        .animation(.none) // No animations
                         .zIndex(10000) // Highest z-index
                 }
             }
@@ -779,7 +772,7 @@ struct TrainingModeView: View {
             // ---- Deal Cards Button Overlay (ABSOLUTE POSITION) ----
             // Hide during dealer turn (flipping cards) or when hand is in progress
             let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
-            let handInProgress = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+            let _ = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
             
             // ALWAYS show buttons when chip selection is visible - simplified logic
             let chipSelectionVisible = !gameState.showNextHand
@@ -957,7 +950,7 @@ struct TrainingModeView: View {
                 let centerX = UIScreen.main.bounds.width / 2
                 let chipsY = UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
                 let titleY = UIScreen.main.bounds.height * 0.7 - 30 - 88
-                let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
+                let _ = gameState.lastPayout > 0 && gameState.showResultNotification
                 // Keep the on-table stacks exactly as-is; only shift their X positions via computeChipPositions().
                 let horizontal = false
                 
@@ -991,7 +984,6 @@ struct TrainingModeView: View {
                     }
                 .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
                 .zIndex(1001)
-                .animation(.none)
                 .transaction { $0.animation = nil }
                 
                 // Additional Bet Chips (Split Hand 1) - SEPARATE ZStack
@@ -1062,13 +1054,13 @@ struct TrainingModeView: View {
                     // Return Bet Button on the right
                     // Hide during dealer turn (flipping cards) or when hand is in progress
                     let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
-                    let handInProgress = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+                    let handInProgressHere = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
                     
                     HStack {
                         Spacer()
                         if !gameState.isAutoCollectingWinnings
                             && !gameState.betChips.isEmpty
-                            && !handInProgress
+                            && !handInProgressHere
                             && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand)
                             && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
                             && !isContinuousAutoPlay {
@@ -1090,7 +1082,7 @@ struct TrainingModeView: View {
                 .zIndex(1001)
                 
                 // Win/Lose/Push Notifications - SEPARATE
-                if let result = gameState.resultMessage, gameState.showResultNotification {
+                if gameState.resultMessage != nil, gameState.showResultNotification {
                     if gameState.lastPayout > 0 {
                         Text("Win $\(gameState.actualWinnings)")
                             .font(.fixedSystem(size: 16, weight: .bold))
@@ -1604,7 +1596,7 @@ struct TrainingModeView: View {
         
         // Check if this is a soft hand (contains Ace counted as 11)
         let hasAce = gameState.playerHand.contains { $0.rank == .ace }
-        let softHandText = gameEngine.getHandValueText(gameState.playerHand)
+        let _ = gameEngine.getHandValueText(gameState.playerHand)
         
         // Check and auto-play called
         
@@ -1628,17 +1620,6 @@ struct TrainingModeView: View {
         
         // Auto-stand if player has 17 or higher (and not busted)
         if playerValue >= 17 {
-            let handDescription: String
-            if playerValue == 21 {
-                handDescription = "21 (TWENTY-ONE!)"
-            } else if hasAce && playerValue == 20 {
-                handDescription = "SOFT 20 (A + 9)"
-            } else if hasAce {
-                handDescription = "SOFT \(playerValue)"
-            } else {
-                handDescription = "HARD \(playerValue)"
-            }
-            
             // Player auto-standing
             
             // For 21 or soft 20, use slightly shorter delay to ensure immediate response
@@ -1672,7 +1653,7 @@ struct TrainingModeView: View {
                 
                 // Add verification that hit worked
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { // Reduced from 1.0 to 0.5 seconds
-                    let newHandCount = gameState.playerHand.count
+                    let _ = gameState.playerHand.count
                     let newValue = gameEngine.handValue(gameState.playerHand)
                     
                     // If we should continue hitting but auto-play stopped, force it
@@ -2001,8 +1982,8 @@ struct ArchTextModifier: ViewModifier {
         content
             .overlay(
                 GeometryReader { geo in
-                    let text = (content as? Text) ?? Text("")
-                    ArchText(text: text, width: width, height: height)
+                    // Content cannot be cast to Text, so use empty text as placeholder
+                    ArchText(text: Text(""), width: width, height: height)
                 }
             )
             .opacity(0) // Hide the original
@@ -2068,14 +2049,12 @@ struct BettingAreaView: View {
                         .offset(x: xOffset, y: yOffset)
                         .zIndex(Double(index))
                         .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
-                        .animation(.none)
                         .transition(.identity)
                         .transaction { $0.animation = nil }
                         .allowsHitTesting(false)
                 }
             }
             .frame(height: 60)
-            .animation(.none)
             .transaction { $0.animation = nil }
             
             // Bet Amount Text with Return Bet Button
@@ -2126,7 +2105,7 @@ struct BettingAreaView: View {
             }
             
             // Win/Lose/Push Notifications
-            if let result = gameState.resultMessage, gameState.showResultNotification {
+            if gameState.resultMessage != nil, gameState.showResultNotification {
                 if gameState.lastPayout > 0 {
                     Text("Win $\(gameState.actualWinnings)")
                         .font(.fixedSystem(size: 16, weight: .bold))

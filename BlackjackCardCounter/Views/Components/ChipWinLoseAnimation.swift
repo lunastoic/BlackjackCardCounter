@@ -29,10 +29,10 @@ struct ChipWinLoseAnimation: View {
             ]
 
             // Win animation chips - overlay circles that follow animation
-            ForEach(Array(winChips.enumerated()), id: \.element.id) { idx, chip in
+            ForEach(Array(winChips.enumerated()), id: \.element.id) { index, chip in
                 ZStack {
                     Circle()
-                        .fill(debugColors[idx % debugColors.count])
+                        .fill(debugColors[index % debugColors.count])
                         .frame(width: 44, height: 44)
                         .opacity(1.0)
                     ChipView(chip: Chip(value: chip.value))
@@ -47,10 +47,10 @@ struct ChipWinLoseAnimation: View {
             }
             
             // Lose animation chips - overlay circles that follow animation
-            ForEach(Array(loseChips.enumerated()), id: \.element.id) { idx, chip in
+            ForEach(Array(loseChips.enumerated()), id: \.element.id) { index, chip in
                 ZStack {
                     Circle()
-                        .fill(debugColors[idx % debugColors.count])
+                        .fill(debugColors[index % debugColors.count])
                         .frame(width: 44, height: 44)
                         .opacity(1.0)
                     ChipView(chip: Chip(value: chip.value))
@@ -234,8 +234,7 @@ struct ChipWinLoseAnimation: View {
         let firstUserXRelative = rowStartRelative + CGFloat(payoutCount) * chipSpacing // 22.5
         let userChipX = centerX + firstUserXRelative // center + 22.5
         // REGULAR MODE: Payout chip must be exactly 45pt to the left (touching, no overlap)
-        let payoutChipX = userChipX - chipSpacing // center + 22.5 - 45 = center - 22.5
-        let clampedStart = clampedRowStartX(startX: payoutChipX, count: payoutCount, spacing: chipSpacing, chipSize: chipSize)
+        let _ = userChipX - chipSpacing // center + 22.5 - 45 = center - 22.5
         
         let source = gameState.betChips.sorted(by: >)
         for chipValue in source.prefix(payoutCount) {
@@ -473,7 +472,7 @@ struct ChipWinLoseAnimation: View {
         // Create chips that match the user's bet
         // Use the SAME spiral order as BlackjackBettingView: sorted(by: >) for highest value at bottom
         let sortedChips = gameState.betChips.sorted(by: >)
-        for (index, chipValue) in sortedChips.enumerated() {
+        for (_, chipValue) in sortedChips.enumerated() {
             let winChip = AnimatedChip(
                 id: UUID(),
                 value: chipValue,
@@ -519,7 +518,7 @@ struct ChipWinLoseAnimation: View {
         // Create chips that match the user's bet
         // Use the SAME spiral order as BlackjackBettingView: sorted(by: >) for highest value at bottom
         let sortedChips = gameState.betChips.sorted(by: >)
-        for (index, chipValue) in sortedChips.enumerated() {
+        for (_, chipValue) in sortedChips.enumerated() {
             let winChip = AnimatedChip(
                 id: UUID(),
                 value: chipValue,
@@ -711,7 +710,7 @@ struct ChipWinLoseAnimation: View {
     ) -> CGFloat {
         var testX = desiredX
         let chipSize: CGFloat = 44.0
-        let halfChip = chipSize / 2
+        let _ = chipSize / 2
         
         // Check if desired position overlaps with any existing chip
         var attempts = 0
@@ -867,12 +866,12 @@ struct ChipWinLoseAnimation: View {
             let hand2Won = gameState.resultMessage?.contains("Hand 2: Win") == true
             let h2PayoutShift: CGFloat = hand2Won ? 184.0 : 0.0
             let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
-            let chipSpacing: CGFloat = 45.0 // chipSize (44) + 1
+            let _: CGFloat = 45.0 // chipSize (44) + 1
             // When payout chips are present, the on-table stacks shift right by 36pt (TrainingModeView),
             // plus a small inter-hand gap tweak to match the Figma mock.
             let payoutOffset: CGFloat = hasPayoutChips ? 36.0 : 0.0
-            let hand2GroupTweak: CGFloat = hasPayoutChips ? -1.0 : 0.0
-            let hand1GroupTweak: CGFloat = hasPayoutChips ? 7.0 : 0.0
+            let _: CGFloat = hasPayoutChips ? -1.0 : 0.0
+            let _: CGFloat = hasPayoutChips ? 7.0 : 0.0
             let hand2DDXOffset: CGFloat = gameState.isSplit ? 
                 (-114.0 + h2PayoutShift + payoutOffset) : 0.0
             for (index, chipValue) in gameState.doubleDownChipsHand2.enumerated() {
@@ -1412,8 +1411,8 @@ struct ChipWinLoseAnimation: View {
             let hand1WonForAnimation = hand1WonParsed
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 // Precompute sorted chip stacks for both hands
-                let mainStackChips = gameState.betChips.sorted(by: >)
-                let additionalStackChips = gameState.additionalBetChips.sorted(by: >)
+                let _ = gameState.betChips.sorted(by: >)
+                let _ = gameState.additionalBetChips.sorted(by: >)
                 let doubleDownChips2 = gameState.doubleDownChipsHand2.sorted(by: >)
                 let doubleDownChips1 = gameState.doubleDownChipsHand1.sorted(by: >)
                 
@@ -1516,11 +1515,6 @@ struct ChipWinLoseAnimation: View {
             print("💰 DUAL STACK WIN: Main stack chips: \(mainStackChips), Additional stack chips: \(additionalStackChips), DD2: \(doubleDownChips2), DD1: \(doubleDownChips1)")
             
             // Non-split: always pay 2 chips on a double-down win (matches existing visuals).
-            let hand2Count = 0
-            let hand1Count = 0
-            let hand2Payout: [Int] = []
-            let hand1Payout: [Int] = []
-            
             winChips.removeAll()
             // Create chips for non-split using the existing non-split win logic below.
             // (Keep this branch minimal to avoid mixed split crashes.)
