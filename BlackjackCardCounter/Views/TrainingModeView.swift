@@ -86,11 +86,20 @@ struct TrainingModeView: View {
         let hand2Doubled = !gameState.doubleDownChipsHand2.isEmpty
         let hand1Doubled = !gameState.doubleDownChipsHand1.isEmpty
         let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
+        let hasRegularDD = !gameState.isSplit && !gameState.additionalBetChips.isEmpty
+        let regularUserStackCount: Int = hasRegularDD ? 2 : 1
+        let regularPayoutCount: Int = hasPayoutChips ? (hasRegularDD ? 2 : 1) : 0
+        let regularTotalCount: Int = regularUserStackCount + regularPayoutCount
         
         // When payout chips are present (while payout chips are animating / placed),
         // shift BOTH stacks per hand slightly right to make room on the left.
         // Tuned so the 2 payout chips per hand fit cleanly on the left.
         let payoutOffset: CGFloat = hasPayoutChips ? 36.0 : 0.0
+        
+        // Non-split: treat the payout+user stacks as one touching row that stays centered.
+        // Row positions: start at -spacing*(total-1)/2; payout chips are first; user stacks follow.
+        let nonSplitRowStart: CGFloat = -chipSpacing * CGFloat(max(regularTotalCount - 1, 0)) / 2.0
+        let nonSplitFirstUserX: CGFloat = nonSplitRowStart + CGFloat(regularPayoutCount) * chipSpacing
         // Extra spacing between the two 4-chip groups (Figma mock):
         // push Hand 2 group slightly left, Hand 1 group slightly right.
         let hand2GroupTweak: CGFloat = hasPayoutChips ? -1.0 : 0.0
@@ -98,10 +107,13 @@ struct TrainingModeView: View {
         
         // Hand 2 bet chips: Fixed position (no win/loss shift), plus payout nudge
         let hand2BetXOffset: CGFloat = gameState.isSplit ? 
-            (-70.0 + payoutOffset + hand2GroupTweak) : 0.0
+            (-70.0 + payoutOffset + hand2GroupTweak) : (hasRegularDD ? (nonSplitFirstUserX + chipSpacing) : nonSplitFirstUserX)
         
-        let hand1BetXOffset: CGFloat = gameState.isSplit ? 
-            (70.0 + (hand1Doubled ? 10.0 : 0.0) + payoutOffset + hand1GroupTweak) : 60.0
+        // In split: Hand 1 bet stack on the right.
+        // In non-split: additionalBetChips represents the double-down stack; it should touch the LEFT of the main bet stack.
+        let hand1BetXOffset: CGFloat = gameState.isSplit ?
+            (70.0 + (hand1Doubled ? 10.0 : 0.0) + payoutOffset + hand1GroupTweak) :
+            (hasRegularDD ? nonSplitFirstUserX : 0.0)
         
         // Hand 2 double down chips: Position to the LEFT of bet chips (44 points to the left, touching)
         // Bet chips are at -70.0, so DD chips at -70.0 - 44.0 = -114.0
@@ -765,10 +777,20 @@ struct TrainingModeView: View {
             }
             
             // ---- Deal Cards Button Overlay (ABSOLUTE POSITION) ----
-            if (gameState.lastBet != nil || gameState.resultMessage != nil
-                || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) 
-                && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
-                && !gameState.isDealing && !isContinuousAutoPlay {
+            // Hide during dealer turn (flipping cards) or when hand is in progress
+            let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+            let handInProgress = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+            
+            // ALWAYS show buttons when chip selection is visible - simplified logic
+            let chipSelectionVisible = !gameState.showNextHand
+            let showingResult = gameState.resultMessage != nil && gameState.showResultNotification
+            let isActiveGameplay = (gameState.playerHand.count >= 2 && gameState.isPlayerTurn) || isContinuousAutoPlay
+            // Hide buttons during dealer's turn ONLY if round is still in progress (showNextHand is true)
+            // After round ends (showNextHand is false), show buttons regardless of dealer turn status
+            let dealerHasCards = !gameState.dealerHand.isEmpty
+            let dealerTurnInProgress = gameState.showNextHand && dealerHasCards && !gameState.isPlayerTurn && !gameState.isDealing
+            
+            if (chipSelectionVisible || showingResult) && !isActiveGameplay && !dealerTurnInProgress {
 
                 VStack(spacing: 16) {
                     DealNextHandButtons(
@@ -820,7 +842,8 @@ struct TrainingModeView: View {
                         }
                     )
                 }
-                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.8)
+                // Shift down slightly to match Regular Mode spacing relative to chip selection
+                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.8 + 4)
                 .zIndex(997) // Below action buttons
             }
             
@@ -917,6 +940,7 @@ struct TrainingModeView: View {
             
             // Chip Win/Lose Animation - Clean and simple animation system
             ChipWinLoseAnimation(gameState: gameState)
+                .ignoresSafeArea(.all)
                 .zIndex(99999) // Highest z-index to ensure visibility
             
             // Strategy chart overlay - positioned at the absolute top layer
@@ -946,6 +970,7 @@ struct TrainingModeView: View {
                     .position(x: centerX, y: titleY)
                     .zIndex(1001)
                 
+                
                 // Shared debug palette for chip overlays
                 let debugColors: [Color] = [
                     Color(red: 0.5, green: 0, blue: 0),      // dark red
@@ -958,16 +983,16 @@ struct TrainingModeView: View {
                     Color(red: 0.4, green: 0.6, blue: 1.0)   // light blue
                 ]
                 
-                // Bet Chip Stack (Hand 2 / Left)
+                // Bet Chip Stack (Hand 2 / Left) - Keep using .position() for rendering
                 chipStackAnyView(chips: gameState.betChips, debugColors: debugColors, horizontal: horizontal)
                     .position(x: centerX + chipPositions.hand2BetXOffset, y: chipsY)
+                    .onAppear {
+                        if gameState.isSplit { print("🎰 CHIP STACK (H2 Bet): Fixed left position for split") }
+                    }
                 .animation(.easeOut(duration: 0.4), value: gameState.resultMessage)
                 .zIndex(1001)
                 .animation(.none)
                 .transaction { $0.animation = nil }
-                .onAppear {
-                    if gameState.isSplit { print("🎰 CHIP STACK (H2 Bet): Fixed left position for split") }
-                }
                 
                 // Additional Bet Chips (Split Hand 1) - SEPARATE ZStack
                 if !gameState.additionalBetChips.isEmpty {
@@ -1035,9 +1060,18 @@ struct TrainingModeView: View {
                     }
                     
                     // Return Bet Button on the right
+                    // Hide during dealer turn (flipping cards) or when hand is in progress
+                    let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+                    let handInProgress = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+                    
                     HStack {
                         Spacer()
-                        if !gameState.betChips.isEmpty && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) && !isContinuousAutoPlay {
+                        if !gameState.isAutoCollectingWinnings
+                            && !gameState.betChips.isEmpty
+                            && !handInProgress
+                            && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand)
+                            && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
+                            && !isContinuousAutoPlay {
                             Button(action: {
                                 bettingManager.returnBet(gameState: gameState)
                             }) {
@@ -1085,7 +1119,8 @@ struct TrainingModeView: View {
                         bettingManager: bettingManager
                     )
                     .disabled(gameState.isDealing)
-                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 160 - 5)
+                    // Shift down slightly to match Regular Mode spacing under Win/Lose text
+                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 160 - 1)
                     .zIndex(1001)
                 }
             }

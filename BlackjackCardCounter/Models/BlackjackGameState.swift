@@ -55,6 +55,7 @@ class BlackjackGameState: ObservableObject {
     @Published var showResultNotification: Bool = true // Track when to show win/lose notifications
     @Published var userPlacedCurrentBet: Bool = false // True only when user explicitly placed/redo bet this round
     @Published var autoCollectWinningsToggle: Bool = false // Triggers animation to collect winnings back to user
+    @Published var isAutoCollectingWinnings: Bool = false // True while chips animate back to chip selection
     
     // Deck shuffling state
     @Published var showShufflingNotification: Bool = false // Show "shuffling deck after this round" notification

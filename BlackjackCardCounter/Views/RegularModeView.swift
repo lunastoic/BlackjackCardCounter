@@ -238,7 +238,7 @@ struct RegularModeView: View {
                     
                         // Result message is now displayed in overlay to prevent layout movement
                     
-                    VStack(spacing: 0) { // Original spacing to match previous layout
+                    VStack(spacing: 0) { // Fixed spacing: 0 to prevent any layout shifts
                         // Betting Area Title
                         Text("Betting Area")
                             .font(.headline)
@@ -276,13 +276,28 @@ struct RegularModeView: View {
                                         .offset(x: (hand1Doubled ? (80.0 + 45.0) : 30.0) + payoutOffset + hand1GroupTweak)
                                 }
                             } else {
-                                // Non-split: keep existing layout (main + optional extra)
-                                let chipStacks = chipStacksForCurrentState()
-                                let stackSpacing: CGFloat = chipStacks.count >= 2 ? 60 : 0
-                                HStack(spacing: stackSpacing) {
-                                    ForEach(chipStacks) { stack in
-                                        chipStackView(for: stack.chips)
-                                    }
+                                // Non-split: if doubled down, show the DD stack touching the LEFT of the main bet stack.
+                                // During payout display, shift the user stacks so the full row stays centered under the title.
+                                let chipSize: CGFloat = 44.0
+                                let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touching
+                                let hasRegularDD = !gameState.additionalBetChips.isEmpty
+                                
+                                // If payout chips are present, we conceptually have a single horizontal row:
+                                // [payout chips ...] [user chips ...], all touching and centered.
+                                let userStackCount = hasRegularDD ? 2 : 1
+                                let payoutCount = hasPayoutChips ? (hasRegularDD ? 2 : 1) : 0
+                                let totalCount = userStackCount + payoutCount
+                                let rowStart: CGFloat = -chipSpacing * CGFloat(max(totalCount - 1, 0)) / 2.0
+                                let firstUserX: CGFloat = rowStart + CGFloat(payoutCount) * chipSpacing
+                                
+                                if hasRegularDD {
+                                    chipStackView(for: gameState.additionalBetChips)
+                                        .offset(x: firstUserX)
+                                    chipStackView(for: gameState.betChips)
+                                        .offset(x: firstUserX + chipSpacing)
+                                } else {
+                                    chipStackView(for: gameState.betChips)
+                                        .offset(x: firstUserX)
                                 }
                             }
                         }
@@ -290,8 +305,21 @@ struct RegularModeView: View {
                         .frame(maxWidth: .infinity)
                         .animation(.none, value: gameState.isSplit)
                         .transaction { $0.animation = nil }
+                        // Capture on-table chip row position for payout animations (global coordinates).
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .onAppear {
+                                        let frame = geometry.frame(in: .global)
+                                        gameState.bettingAreaPosition = CGPoint(x: frame.midX, y: frame.midY)
+                                    }
+                                    .onChange(of: geometry.frame(in: .global)) { newFrame in
+                                        gameState.bettingAreaPosition = CGPoint(x: newFrame.midX, y: newFrame.midY)
+                                    }
+                            }
+                        )
                         
-                        // Bet Amount Text with Return Bet Button
+                        // Bet Amount Text with Return Bet Button - Fixed height to prevent layout shifts
                         ZStack {
                             // Centered Bet Amount Text
                             Text("Bet: $\(gameState.playerBet)")
@@ -300,9 +328,17 @@ struct RegularModeView: View {
                                 .padding(.vertical, 5)
                             
                             // Return Bet Button on the right
+                            // Match Training Mode logic exactly
+                            let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+                            let handInProgress = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+                            
                             HStack {
                                 Spacer()
-                                if !gameState.betChips.isEmpty && !gameState.isDealing && (gameState.lastBet != nil || gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
+                                if !gameState.isAutoCollectingWinnings
+                                    && !gameState.betChips.isEmpty
+                                    && !handInProgress
+                                    && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand)
+                                    && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
                                     Button(action: {
                                         bettingManager.returnBet(gameState: gameState)
                                     }) {
@@ -314,46 +350,66 @@ struct RegularModeView: View {
                                             .background(Color(hex: "ff0000"))
                                             .cornerRadius(8)
                                     }
+                                } else {
+                                    // Reserve space for button even when hidden to prevent layout shifts
+                                    Color.clear
+                                        .frame(width: 100, height: 36)
                                 }
                             }
                         }
+                        .frame(height: 40) // Fixed height to prevent shifts
                         
-                        // Win/Lose/Push Notifications
-                        if let result = gameState.resultMessage, gameState.showResultNotification {
-                            if gameState.lastPayout > 0 {
-                                Text("Win $\(gameState.actualWinnings)")
-                                    .font(.fixedSystem(size: 16, weight: .bold))
-                                    .foregroundColor(.green)
-                            } else if gameState.lastPayout < 0 {
-                                Text("Lose $\(abs(gameState.actualWinnings))")
-                                    .font(.fixedSystem(size: 16, weight: .bold))
-                                    .foregroundColor(.red)
+                        // Win/Lose/Push Notifications - Fixed height to prevent layout shifts
+                        Group {
+                            if let result = gameState.resultMessage, gameState.showResultNotification {
+                                if gameState.lastPayout > 0 {
+                                    Text("Win $\(gameState.actualWinnings)")
+                                        .font(.fixedSystem(size: 16, weight: .bold))
+                                        .foregroundColor(.green)
+                                } else if gameState.lastPayout < 0 {
+                                    Text("Lose $\(abs(gameState.actualWinnings))")
+                                        .font(.fixedSystem(size: 16, weight: .bold))
+                                        .foregroundColor(.red)
+                                } else {
+                                    Text("Push $\(gameState.actualWinnings)")
+                                        .font(.fixedSystem(size: 16, weight: .bold))
+                                        .foregroundColor(.green)
+                                }
                             } else {
-                                Text("Push $\(gameState.actualWinnings)")
+                                // Reserve space even when notification is not shown to prevent layout shifts
+                                Text("")
                                     .font(.fixedSystem(size: 16, weight: .bold))
-                                    .foregroundColor(.green)
+                                    .frame(height: 20)
+                                    .opacity(0)
                             }
                         }
+                        .frame(height: 20) // Fixed height
                         
-                        // User's Available Chips
+                        // User's Available Chips - Fixed position to prevent shifts
                         if !gameState.showNextHand {
                             ChipSelectionView(
                                 gameState: gameState,
                                 bettingManager: bettingManager
                             )
                             .disabled(gameState.isDealing)
+                            .offset(y: 0) // Explicitly set to prevent any shifts
                         }
                         
                         
                     }
                     
-                    let readyForNextHand = gameState.showPostGameButtons
-                    let initialState = (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty && gameState.resultMessage == nil && gameState.lastBet == nil)
+                    // ALWAYS show buttons when chip selection is visible - simplified logic
+                    let chipSelectionVisible = !gameState.showNextHand
+                    let showingResult = (gameState.resultMessage != nil && gameState.showResultNotification) || gameState.showPostGameButtons
+                    let isActiveGameplay = (gameState.playerHand.count >= 2 && gameState.isPlayerTurn) || 
+                                          (gameState.isDealing && gameState.playerHand.count >= 2) ||
+                                          gameState.isProcessingAction
+                    // Hide buttons during dealer's turn ONLY if round is still in progress (showNextHand is true)
+                    // After round ends (showNextHand is false), show buttons regardless of dealer turn status
+                    let dealerHasCards = !gameState.dealerHand.isEmpty
+                    let dealerTurnInProgress = gameState.showNextHand && dealerHasCards && !gameState.isPlayerTurn && !gameState.isDealing
                     
-                    if (readyForNextHand || initialState)
-                        && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
-                        && !gameState.isDealing
-                        && !gameState.isProcessingAction {
+                    if (chipSelectionVisible || showingResult) && !isActiveGameplay && !dealerTurnInProgress {
 
                         VStack(spacing: 16) {
                             DealNextHandButtons(

@@ -1021,11 +1021,12 @@ struct MapCard: View {
             }
         )
         .contentShape(Rectangle())
-        .onTapGesture {
+        // Use simultaneousGesture so it doesn't steal taps from the mode NavigationLinks.
+        .simultaneousGesture(TapGesture().onEnded {
             if unlocked {
                 onTap()
             }
-        }
+        })
         .onAppear { wasUnlocked = unlocked }
         .onChange(of: unlocked) { newValue in
             if newValue && !wasUnlocked {

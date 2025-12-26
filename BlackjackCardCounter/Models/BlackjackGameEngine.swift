@@ -936,6 +936,8 @@ class BlackjackGameEngine: ObservableObject {
             print("💰 Clearing chips for push result")
         } else if payout > 0 {
             print("💰 Preserving chips for win result temporarily (will auto-collect)")
+            // Hide "Return Bet" immediately during payout + auto-collect (covers the 2s delay too).
+            gameState.isAutoCollectingWinnings = true
             let betSnapshot = gameState.betChips
             let addSnapshot = gameState.additionalBetChips
             let dd1Snapshot = gameState.doubleDownChipsHand1
@@ -951,6 +953,7 @@ class BlackjackGameEngine: ObservableObject {
                       gameState.doubleDownChipsHand2 == dd2Snapshot,
                       gameState.playerBet == playerBetSnapshot else {
                     print("💰 Auto-collect skipped: player already placed a new bet")
+                    gameState.isAutoCollectingWinnings = false
                     return
                 }
                 

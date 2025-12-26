@@ -22,11 +22,7 @@ struct TrainingModeFlipCardView: View {
                     // During flip: two layers with opposing rotations for a natural hinge
                     ZStack {
                         // FACE (becomes visible after 90°, ends at 0°)
-                        Image(cardImageName)
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                            .frame(width: width, height: 90)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        faceView
                             .opacity(rotation >= 90 ? 1 : 0)
                             .rotation3DEffect(
                                 .degrees(rotation - 180),
@@ -48,11 +44,7 @@ struct TrainingModeFlipCardView: View {
                 } else {
                     // At rest: render a single side without any rotation
                     if showingFace {
-                        Image(cardImageName)
-                            .resizable()
-                            .aspectRatio(0.7, contentMode: .fit)
-                            .frame(width: width, height: 90)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        faceView
                     } else {
                         Image("DeckCover")
                             .resizable()
@@ -115,6 +107,32 @@ struct TrainingModeFlipCardView: View {
         let baseName = "\(rankString)Of\(suitString)"
         let imageName = "T_\(baseName)"
         return imageName
+    }
+
+    private var faceView: some View {
+        Group {
+            if UIImage(named: cardImageName) != nil {
+                Image(cardImageName)
+                    .resizable()
+                    .aspectRatio(0.7, contentMode: .fit)
+            } else {
+                // Fallback: render rank/suit so we never show a blank outline card
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.25))
+                    .overlay(
+                        VStack(spacing: 2) {
+                            Text(card.rank.rawValue)
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(card.suit.rawValue)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    )
+            }
+        }
+        .frame(width: width, height: 90)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
     // Training mode glow color logic

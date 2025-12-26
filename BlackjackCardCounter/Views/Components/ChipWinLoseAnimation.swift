@@ -8,7 +8,14 @@ struct ChipWinLoseAnimation: View {
     @State private var savedLoseChips: [Int] = [] // Save chips for lose animation
     
     var body: some View {
-        ZStack {
+        GeometryReader { geo in
+            // Convert global chip positions -> local offsets using the overlay's actual global frame.
+            let frame = geo.frame(in: .global)
+            let _ = print("🎯 CHIP OVERLAY FRAME: minX=\(frame.minX), minY=\(frame.minY), maxX=\(frame.maxX), maxY=\(frame.maxY), midX=\(frame.midX), midY=\(frame.midY)")
+            
+            // Use a top-left anchored container so mapping (global -> local) is stable across
+            // both Training + Regular modes (avoids center-offset drift).
+            ZStack(alignment: .topLeading) {
             // Shared debug palette for chip overlays
             let debugColors: [Color] = [
                 Color(red: 0.5, green: 0, blue: 0),      // dark red
@@ -30,9 +37,9 @@ struct ChipWinLoseAnimation: View {
                         .opacity(1.0)
                     ChipView(chip: Chip(value: chip.value))
                 }
-                .offset(
-                    x: chip.position.x - UIScreen.main.bounds.width / 2,
-                    y: chip.position.y - UIScreen.main.bounds.height / 2
+                    .position(
+                        x: chip.position.x - frame.minX,
+                        y: chip.position.y - frame.minY
                 )
                 .opacity(chip.opacity)
                 .scaleEffect(chip.scale)
@@ -48,14 +55,16 @@ struct ChipWinLoseAnimation: View {
                         .opacity(1.0)
                     ChipView(chip: Chip(value: chip.value))
                 }
-                .offset(
-                    x: chip.position.x - UIScreen.main.bounds.width / 2,
-                    y: chip.position.y - UIScreen.main.bounds.height / 2
+                    .position(
+                        x: chip.position.x - frame.minX,
+                        y: chip.position.y - frame.minY
                 )
                 .opacity(chip.opacity)
                 .scaleEffect(chip.scale)
                 .zIndex(20000)
             }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false) // Don't interfere with user interactions
@@ -204,42 +213,56 @@ struct ChipWinLoseAnimation: View {
         // Clear any existing win chips
         winChips.removeAll()
         
-        // Create matching chips for the payout
         let dealerPos = getDealerPosition()
+        // REGULAR MODE SPECIFIC: Non-split win payout chips should land touching the LEFT side of the on-table stack.
+        // Regular Mode uses GeometryReader to capture bettingAreaPosition, and chips are offset relative to that center.
+        // View calculates: rowStart = -22.5 (relative), firstUserX = 22.5 (relative)
+        // So payout chip is 45pt to the left of user chip (touching)
+        let chipSize: CGFloat = 44.0
+        let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touching
+        let payoutCount = 1
+        let bettingPos = getRegularModeBettingPosition()
+        let centerX = bettingPos.x
         
-        // REGULAR MODE: Final fine-tuned position for perfect alignment
-        let payoutX: CGFloat = UIScreen.main.bounds.width * 0.5 - 60  // Left of betting area
-        let payoutY: CGFloat = UIScreen.main.bounds.height * 0.75 - 130.2 + 18  // Moved down 18 points
+        // REGULAR MODE FIX: Calculate payout position to match exact view layout
+        // The view renders: user chip at offset(x: firstUserX) where firstUserX = 22.5 (relative to center)
+        // So user chip is at: centerX + 22.5
+        // Payout chip should be: centerX + 22.5 - 45 = centerX - 22.5
+        let userStackCount = 1
+        let totalCount = payoutCount + userStackCount // 2 chips total
+        let rowStartRelative = -chipSpacing * CGFloat(max(totalCount - 1, 0)) / 2.0 // -22.5
+        let firstUserXRelative = rowStartRelative + CGFloat(payoutCount) * chipSpacing // 22.5
+        let userChipX = centerX + firstUserXRelative // center + 22.5
+        // REGULAR MODE: Payout chip must be exactly 45pt to the left (touching, no overlap)
+        let payoutChipX = userChipX - chipSpacing // center + 22.5 - 45 = center - 22.5
+        let clampedStart = clampedRowStartX(startX: payoutChipX, count: payoutCount, spacing: chipSpacing, chipSize: chipSize)
         
-        print("💰 REGULAR MODE WIN: payoutX=\(payoutX), payoutY=\(payoutY)")
-        
-        // Create chips that match the user's bet
-        let sortedChips = gameState.betChips.sorted(by: >)
-        for (index, chipValue) in sortedChips.enumerated() {
-            let winChip = AnimatedChip(
-                id: UUID(),
-                value: chipValue,
-                position: dealerPos,
-                opacity: 1.0,
-                scale: 1.0
-            )
-            winChips.append(winChip)
+        let source = gameState.betChips.sorted(by: >)
+        for chipValue in source.prefix(payoutCount) {
+            winChips.append(AnimatedChip(id: UUID(), value: chipValue, position: dealerPos, opacity: 1.0, scale: 1.0))
         }
         
-        // Animate chips from dealer to betting area
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            for i in 0..<winChips.count {
-                let angle = Double(i) * 0.8  // Tighter spiral
-                let radius: CGFloat = 2.0    // Closer stacking
-                let xOffset = radius * cos(angle)
-                let yOffset = radius * sin(angle)
-                
-                winChips[i].position = CGPoint(
-                    x: payoutX + xOffset,
-                    y: payoutY + yOffset
-                )
-                
-                print("💰 REGULAR MODE WIN: Chip \(i) positioned at x=\(payoutX + xOffset), y=\(payoutY + yOffset)")
+            // REGULAR MODE SPECIFIC FIX FOR NON-SPLIT NON-DD ONLY:
+            // The bettingAreaPosition is captured at frame.midY of the 60pt container
+            // For Regular Mode non-split, shift UP to align with actual chip rendering position
+            // This is Regular Mode specific - Training Mode uses +97 and works perfectly
+            let regularModeNonSplitYOffset: CGFloat = 0 // Shift UP by 20 points from previous position
+            let regularModeChipY = bettingPos.y + regularModeNonSplitYOffset
+            
+            // REGULAR MODE X: Calculate payout X to be exactly 45pt to the left of user chip
+            // View: rowStart = -22.5, firstUserX = 22.5, so user chip at center + 22.5
+            // Payout: center - 22.5 (exactly 45pt to the left, touching, no overlap)
+            let finalPayoutX = centerX + rowStartRelative // centerX - 22.5
+            
+            print("💰 REGULAR WIN (NON-SPLIT NON-DD): Regular Mode specific Y adjustment")
+            print("💰 REGULAR WIN: bettingPos.y=\(bettingPos.y), offset=\(regularModeNonSplitYOffset), chipY=\(regularModeChipY)")
+            print("💰 REGULAR WIN: finalPayoutX=\(finalPayoutX), userChipX=\(userChipX), spacing=\(userChipX - finalPayoutX)")
+            
+            for i in 0..<min(payoutCount, winChips.count) {
+                let xPos = finalPayoutX + CGFloat(i) * chipSpacing
+                winChips[i].position = CGPoint(x: xPos, y: regularModeChipY)
+                print("💰 REGULAR WIN: Payout chip \(i) final position: (\(xPos), \(regularModeChipY))")
             }
         }
     }
@@ -255,48 +278,43 @@ struct ChipWinLoseAnimation: View {
         // Clear any existing win chips
         winChips.removeAll()
         
-        // Create matching chips for the payout
         let dealerPos = getDealerPosition()
         
-        // TRAINING MODE: Final fine-tuned position for perfect alignment
-        let basePayoutX: CGFloat = UIScreen.main.bounds.width * 0.5 - 60  // Left of betting area
-        let basePayoutY: CGFloat = UIScreen.main.bounds.height * 0.75 - 191.5 + 77 - 3  // Moved down 77 points, then up 3 points
+        // Non-split training win payout chips should land touching the LEFT side of the on-table stack.
+        // Match the layout logic from TrainingModeView: centered row [payout][bet]
+        // View calculates: rowStart = -22.5 (relative), firstUserX = 22.5 (relative)
+        // So payout chip is 45pt to the left of user chip (touching)
+        let chipSize: CGFloat = 44.0
+        let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touching
+        let payoutCount = 1
+        let bettingPos = getTrainingModeBettingPosition()
+        let centerX = bettingPos.x
+        // Calculate where user chip is positioned (relative to center, then add to center)
+        let userStackCount = 1
+        let totalCount = payoutCount + userStackCount // 2 chips total
+        let rowStartRelative = -chipSpacing * CGFloat(max(totalCount - 1, 0)) / 2.0 // -22.5
+        let firstUserXRelative = rowStartRelative + CGFloat(payoutCount) * chipSpacing // 22.5
+        let userChipX = centerX + firstUserXRelative // center + 22.5
+        // Payout chip is 45pt to the left of user chip (touching)
+        let payoutChipX = userChipX - chipSpacing // center + 22.5 - 45 = center - 22.5
+        let clampedStart = clampedRowStartX(startX: payoutChipX, count: payoutCount, spacing: chipSpacing, chipSize: chipSize)
         
-        // SPLIT ADJUSTMENT: If user has split hands, shift DOWN by 3 points (8 up from prior)
-        let splitOffset: CGFloat = gameState.isSplit ? 3 : 0
-        let payoutX = basePayoutX
-        let payoutY = basePayoutY + splitOffset
-        
-        print("💰 TRAINING MODE WIN: isSplit=\(gameState.isSplit), splitOffset=\(splitOffset)")
-        print("💰 TRAINING MODE WIN: payoutX=\(payoutX), payoutY=\(payoutY) (base: \(basePayoutY))")
-        
-        // Create chips that match the user's bet
-        let sortedChips = gameState.betChips.sorted(by: >)
-        for (index, chipValue) in sortedChips.enumerated() {
-            let winChip = AnimatedChip(
-                id: UUID(),
-                value: chipValue,
-                position: dealerPos,
-                opacity: 1.0,
-                scale: 1.0
-            )
-            winChips.append(winChip)
+        let source = gameState.betChips.sorted(by: >)
+        for chipValue in source.prefix(payoutCount) {
+            winChips.append(AnimatedChip(id: UUID(), value: chipValue, position: dealerPos, opacity: 1.0, scale: 1.0))
         }
         
-        // Animate chips from dealer to betting area
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            for i in 0..<winChips.count {
-                let angle = Double(i) * 0.8  // Tighter spiral
-                let radius: CGFloat = 2.0    // Closer stacking
-                let xOffset = radius * cos(angle)
-                let yOffset = radius * sin(angle)
-                
-                winChips[i].position = CGPoint(
-                    x: payoutX + xOffset,
-                    y: payoutY + yOffset
-                )
-                
-                print("💰 TRAINING MODE WIN: Chip \(i) positioned at x=\(payoutX + xOffset), y=\(payoutY + yOffset)")
+            // For non-split, non-double-down: shift payout chip down to align with betting chips
+            let adjustedY = bettingPos.y + 97 // Same offset as split scenarios
+            // Match view layout: payout chip should be 45pt to the left of user chip (touching)
+            // View calculates: rowStart = -22.5 (relative), firstUserX = 22.5 (relative)
+            // So payout at center - 22.5, user at center + 22.5 (45pt apart, touching)
+            print("💰 TRAINING WIN: centerX=\(centerX), userChipX=\(userChipX), payoutChipX=\(payoutChipX), clampedStart=\(clampedStart), adjustedY=\(adjustedY)")
+            for i in 0..<min(payoutCount, winChips.count) {
+                let xPos = clampedStart + CGFloat(i) * chipSpacing
+                winChips[i].position = CGPoint(x: xPos, y: adjustedY)
+                print("💰 TRAINING WIN: Payout chip \(i) at (\(xPos), \(adjustedY))")
             }
         }
     }
@@ -784,6 +802,7 @@ struct ChipWinLoseAnimation: View {
     // MARK: - Auto Collect Winnings Animation (bet + winnings back to chip selection)
     private func startAutoCollectWinningsAnimation() {
         print("💰 AUTO-COLLECT: Animating bet and winnings back to chip selection")
+        gameState.isAutoCollectingWinnings = true
         
         // Use chip selection as the target; fallback to bottom-center if missing
         let targetPos = getChipSelectionPosition() != .zero
@@ -894,6 +913,12 @@ struct ChipWinLoseAnimation: View {
         // Animate both winnings (winChips) and table chips together toward target
         let animationDuration = 0.6
         
+        // If nothing to animate, end immediately (prevents Return Bet being hidden too long)
+        if winChips.isEmpty && tableChips.isEmpty {
+            gameState.isAutoCollectingWinnings = false
+            return
+        }
+        
         // Animate existing winChips (winnings)
         withAnimation(.easeInOut(duration: animationDuration)) {
             for i in 0..<winChips.count {
@@ -917,6 +942,7 @@ struct ChipWinLoseAnimation: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration + 0.1) {
             winChips.removeAll()
             loseChips.removeAll()
+            gameState.isAutoCollectingWinnings = false
         }
     }
     
@@ -1066,17 +1092,20 @@ struct ChipWinLoseAnimation: View {
     
     // MARK: - Mode-Specific Position Functions
     private func getRegularModeBettingPosition() -> CGPoint {
-        return CGPoint(
-            x: UIScreen.main.bounds.width * 0.5,
-            y: UIScreen.main.bounds.height * 0.75 // Regular mode betting area (perfect position)
-        )
+        // Prefer the captured on-table chip row position for accurate animations.
+        if gameState.bettingAreaPosition != .zero {
+            return gameState.bettingAreaPosition
+        }
+        return CGPoint(x: UIScreen.main.bounds.width * 0.5, y: UIScreen.main.bounds.height * 0.75)
     }
     
     private func getTrainingModeBettingPosition() -> CGPoint {
-        return CGPoint(
-            x: UIScreen.main.bounds.width * 0.5,
-            y: UIScreen.main.bounds.height * 0.75 - 120 // Training mode betting area (120 points higher)
-        )
+        // Training Mode: Use calculated chipsY directly (screen coordinate).
+        // The overlay will convert this correctly using its frame offset.
+        let calculatedY = UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
+        let calculatedPos = CGPoint(x: UIScreen.main.bounds.width * 0.5, y: calculatedY)
+        print("💰 TRAINING MODE: Using calculated position: \(calculatedPos)")
+        return calculatedPos
     }
     
     private func getRegularModePayoutPosition() -> CGPoint {
@@ -1117,10 +1146,11 @@ struct ChipWinLoseAnimation: View {
     }
     
     private func getChipSelectionPosition() -> CGPoint {
-        return CGPoint(
-            x: UIScreen.main.bounds.width * 0.5,
-            y: UIScreen.main.bounds.height * 0.88 // Chip selection area
-        )
+        // Prefer captured chip selection center when available.
+        if gameState.chipSelectionAreaPosition != .zero {
+            return gameState.chipSelectionAreaPosition
+        }
+        return CGPoint(x: UIScreen.main.bounds.width * 0.5, y: UIScreen.main.bounds.height * 0.88)
     }
     
     // MARK: - Dual Stack Results Detection and Handling
@@ -1282,14 +1312,11 @@ struct ChipWinLoseAnimation: View {
         
         let dealerPos = getDealerPosition()
         
-        // Calculate base positions with final fine-tuning for perfect alignment
-        let basePayoutY: CGFloat = trainingModeEnabled ? 
-            UIScreen.main.bounds.height * 0.75 - 191.5 + 77 - 3 :  // Training mode (moved down 77 points, then up 3)
-            UIScreen.main.bounds.height * 0.75 - 130.2 + 18     // Regular mode (moved down 18 points)
-        
-        // Apply split offset for training mode (shift DOWN by 3 when split)
-        let splitOffset: CGFloat = (trainingModeEnabled && gameState.isSplit) ? 3 : 0
-        let payoutY = basePayoutY + splitOffset
+        // Use captured betting area position for accurate Y alignment (works for both modes).
+        // Both modes now use GeometryReader to capture the actual global position.
+        let bettingPos = trainingModeEnabled ? getTrainingModeBettingPosition() : getRegularModeBettingPosition()
+        let payoutY = bettingPos.y
+        print("💰 DUAL STACK WIN: trainingModeEnabled=\(trainingModeEnabled), bettingPos=\(bettingPos), payoutY=\(payoutY)")
         
         // Compute payout X positions depending on scenario
         let centerX: CGFloat = UIScreen.main.bounds.width * 0.5
@@ -1322,7 +1349,8 @@ struct ChipWinLoseAnimation: View {
         }()
         
         print("💰 DUAL STACK WIN: Current payout at x=\(currentPayoutX), Left payout at x=\(leftPayoutX), y=\(payoutY)")
-        print("💰 DUAL STACK WIN: Training mode: \(trainingModeEnabled), Split: \(gameState.isSplit), Split offset: \(splitOffset)")
+        print("💰 DUAL STACK WIN: Training mode: \(trainingModeEnabled), Split: \(gameState.isSplit)")
+        print("💰 DUAL STACK WIN: bettingPos=\(bettingPos), payoutY=\(payoutY), bettingAreaPosition=\(gameState.bettingAreaPosition)")
         
         // For splits (both Training and Regular), only animate payouts for winning hands.
         if gameState.isSplit, let resultMessage = gameState.resultMessage {
@@ -1393,7 +1421,18 @@ struct ChipWinLoseAnimation: View {
                 // Shared layout constants for clean horizontal rows (chip asset is 44x44)
                 let chipSize: CGFloat = 44.0
                 let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touch without gaps, stay on-screen
-                let baseY = UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
+                // Use captured betting position for accurate Y alignment (same as non-split)
+                var bettingPosForSplit = trainingModeEnabled ? getTrainingModeBettingPosition() : getRegularModeBettingPosition()
+                
+                // TRAINING MODE FIX: For split scenarios, shift payout chips down to align with betting chips
+                if trainingModeEnabled {
+                    // Add offset to shift chips down to match where betting chips are rendered
+                    bettingPosForSplit = CGPoint(x: bettingPosForSplit.x, y: bettingPosForSplit.y + 97) // Shift down 97 points to align with betting chips
+                    print("💰 SPLIT PAYOUT (Training): Adjusted Y position down by 97pt: \(bettingPosForSplit)")
+                }
+                
+                let baseY = bettingPosForSplit.y
+                print("💰 SPLIT PAYOUT: trainingModeEnabled=\(trainingModeEnabled), bettingPosForSplit=\(bettingPosForSplit), baseY=\(baseY)")
                 
                 print("\n")
                 print("🎯 ╔═══════════════════════════════════════════════╗")
@@ -1438,7 +1477,7 @@ struct ChipWinLoseAnimation: View {
                     for i in 0..<payoutCount {
                         guard chipIndex < winChips.count else { break }
                         let xPos = clampedStart + CGFloat(i) * chipSpacing
-                        winChips[chipIndex].position = CGPoint(x: xPos, y: payoutY)
+                        winChips[chipIndex].position = CGPoint(x: xPos, y: baseY) // Use baseY (adjusted for Training Mode) instead of payoutY
                         chipIndex += 1
                     }
                 }
@@ -1455,7 +1494,7 @@ struct ChipWinLoseAnimation: View {
                     for i in 0..<payoutCount {
                         guard chipIndex < winChips.count else { break }
                         let xPos = clampedStart + CGFloat(i) * chipSpacing
-                        winChips[chipIndex].position = CGPoint(x: xPos, y: payoutY)
+                        winChips[chipIndex].position = CGPoint(x: xPos, y: baseY) // Use baseY (adjusted for Training Mode) instead of payoutY
                         chipIndex += 1
                     }
                 }
@@ -1486,25 +1525,49 @@ struct ChipWinLoseAnimation: View {
             // Create chips for non-split using the existing non-split win logic below.
             // (Keep this branch minimal to avoid mixed split crashes.)
             if !gameState.isSplit {
-                // If there is an additional stack in non-split (double-down), pay out from that stack.
-                let payoutChips = Array(additionalStackChips.prefix(2))
+                // Non-split double-down: always animate TWO payout chips (one per on-table stack),
+                // even if each stack only has one chip.
+                let payoutChips = Array((additionalStackChips + mainStackChips).prefix(2))
                 for chipValue in payoutChips {
-                    winChips.append(AnimatedChip(id: UUID(), value: chipValue, position: dealerPos, opacity: 1.0, scale: 1.0))
-                }
+                winChips.append(AnimatedChip(id: UUID(), value: chipValue, position: dealerPos, opacity: 1.0, scale: 1.0))
+            }
             }
             
             // Animate chips to positions to the left of each hand's bet chips
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 let chipSize: CGFloat = 44.0
-                let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: near-touching
+                let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touching
                 
-                // Non-split: animate to the existing payout position (center-left), spiral stack.
-                for i in 0..<winChips.count {
-                    let angle = Double(i) * 0.8
-                    let radius: CGFloat = 2.0
-                    let xOffset = radius * cos(angle)
-                    let yOffset = radius * sin(angle)
-                    winChips[i].position = CGPoint(x: currentPayoutX + xOffset, y: payoutY + yOffset)
+                // Non-split double-down: render a 4-chip horizontal row centered under the title:
+                // [payout][payout][DD][BET] all touching.
+                let payoutCount = 2
+                let userStackCount = 2
+                let totalCount = payoutCount + userStackCount
+                
+                // Both modes: Use captured bettingAreaPosition for accurate alignment.
+                // Both modes: Use captured bettingAreaPosition for accurate alignment.
+                // Both now use GeometryReader to capture actual global position.
+                var bettingPos = trainingModeEnabled ? getTrainingModeBettingPosition() : getRegularModeBettingPosition()
+                
+                // TRAINING MODE FIX: For non-split double-down, shift payout chips down to align with betting chips
+                if trainingModeEnabled && !gameState.isSplit {
+                    // Add offset to shift chips down to match where betting chips are rendered
+                    // chipsY calculation: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
+                    // The calculated position might be too high, so add a downward offset
+                    bettingPos = CGPoint(x: bettingPos.x, y: bettingPos.y + 97) // Shift down 97 points to align with betting chips
+                    print("💰 NON-SPLIT DD PAYOUT (Training): Adjusted Y position down by 97pt: \(bettingPos)")
+                }
+                
+                print("💰 NON-SPLIT DD PAYOUT: trainingModeEnabled=\(trainingModeEnabled), bettingPos=\(bettingPos)")
+                
+                let rowStart = centerX - chipSpacing * CGFloat(max(totalCount - 1, 0)) / 2.0
+                let clampedStart = clampedRowStartX(startX: rowStart, count: totalCount, spacing: chipSpacing, chipSize: chipSize)
+                
+                // Payout chips occupy the first two slots of the row.
+                for i in 0..<min(payoutCount, winChips.count) {
+                    let xPos = clampedStart + CGFloat(i) * chipSpacing
+                    winChips[i].position = CGPoint(x: xPos, y: bettingPos.y)
+                    print("💰 NON-SPLIT DD PAYOUT: Chip \(i) at x=\(xPos), y=\(bettingPos.y)")
                 }
             }
         }
@@ -1531,11 +1594,16 @@ struct ChipWinLoseAnimation: View {
         let splitOffset: CGFloat = (trainingModeEnabled && gameState.isSplit) ? 15 : 0
         let loseY = baseLoseY + splitOffset
         
-        // Main stack position (center) - match betting area position
-        let mainStackX: CGFloat = UIScreen.main.bounds.width * 0.5  // Center position
+        // Main stack position:
+        // - Split: main bet stack is centered under left hand area in the existing animation system
+        // - Non-split double-down: main bet stack is the RIGHT stack in the centered pair (+22.5)
+        let chipSpacing: CGFloat = 45.0
+        let mainStackX: CGFloat = UIScreen.main.bounds.width * 0.5 + (gameState.isSplit ? 0 : (chipSpacing / 2.0))
         
-        // Additional stack position (right side - blue circle area) - match betting area position
-        let additionalStackX: CGFloat = UIScreen.main.bounds.width * 0.5 + 60  // 60 points right (matches betting area)
+        // Additional stack position:
+        // - Split: right-side bet stack (+60)
+        // - Non-split double-down: DD stack is the LEFT stack in the centered pair (-22.5)
+        let additionalStackX: CGFloat = UIScreen.main.bounds.width * 0.5 + (gameState.isSplit ? 60 : -(chipSpacing / 2.0))
         
         print("💰 DUAL STACK LOSE: Main stack at x=\(mainStackX), Additional stack at x=\(additionalStackX), y=\(loseY)")
         
@@ -1671,7 +1739,9 @@ struct ChipWinLoseAnimation: View {
         
         let splitOffset: CGFloat = (trainingModeEnabled && gameState.isSplit) ? 15 : 0
         let loseY = baseLoseY + splitOffset
-        let additionalStackX: CGFloat = UIScreen.main.bounds.width * 0.5 + 60  // Right side (matches betting area)
+        // In split, additionalBetChips is the right stack; in non-split double-down, it's the LEFT stack in the centered pair.
+        let chipSpacing: CGFloat = 45.0
+        let additionalStackX: CGFloat = UIScreen.main.bounds.width * 0.5 + (gameState.isSplit ? 60 : -(chipSpacing / 2.0))
         
         // Clear any existing lose chips
         loseChips.removeAll()

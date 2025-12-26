@@ -19,6 +19,8 @@ class BlackjackBettingManager: ObservableObject {
             gameState.displayBetAmount = 0
             // Reset the hide flag to ensure chips are visible
             gameState.hideBetChipsDuringLoseAnimation = false
+            // If a previous win is mid auto-collect, cancel the "hide Return Bet" gating.
+            gameState.isAutoCollectingWinnings = false
             gameState.userPlacedCurrentBet = true
             // Handle previous round results when placing new bet
             if gameState.resultMessage != nil {
@@ -136,6 +138,7 @@ class BlackjackBettingManager: ObservableObject {
         gameState.doubleDownChipsHand1 = [] // Clear double down chips for Hand 1
         gameState.displayBetAmount = 0 // Clear display amount for losses
         gameState.hideBetChipsDuringLoseAnimation = false // Reset hide flag
+        gameState.isAutoCollectingWinnings = false // Ensure Return Bet isn't hidden going into redo bet
         
         // Now place ONLY the ORIGINAL bet (not the total with splits/DD)
         gameState.playerBet = previousBet

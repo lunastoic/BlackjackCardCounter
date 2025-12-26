@@ -14,6 +14,15 @@ struct BlackjackBettingView: View {
         UIView.setAnimationsEnabled(false)
     }
     
+    // Hide during dealer turn (flipping cards) or when hand is in progress
+    private var dealerIsFlipping: Bool {
+        !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+    }
+    
+    private var handInProgress: Bool {
+        gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Fixed "Betting Area" title - moves down when chips are present
@@ -140,7 +149,9 @@ struct BlackjackBettingView: View {
                 }
                 
                 // Return Bet Button positioned on the right
-                if gameState.playerBet > 0 && !gameState.showNextHand {
+                let dealerIsFlippingHere = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+                let handInProgressHere = gameState.isDealing || gameState.isProcessingAction || dealerIsFlippingHere
+                if !gameState.isAutoCollectingWinnings && gameState.playerBet > 0 && !gameState.showNextHand && !handInProgressHere {
                     HStack {
                         Spacer()
                         Button(action: {
@@ -273,7 +284,8 @@ struct ChipSelectionView: View {
         }
         .animation(.none) // Disable animations on the entire VStack
         .transaction { $0.animation = nil } // Completely disable all animations
-        .offset(y: !gameState.betChips.isEmpty ? 10 : 0) // Move down 10 points when chips are present
+        // Keep chip selection fixed; otherwise it jumps when bet chips auto-collect/clear.
+        .offset(y: 0)
         .padding(.horizontal, 8) // Add horizontal padding for better spacing
         .padding(.vertical, 8) // Add vertical padding for better spacing
         .padding(.bottom, 12)
@@ -306,134 +318,67 @@ struct DealNextHandButtons: View {
     let gameEngine: BlackjackGameEngine
     let bettingManager: BlackjackBettingManager
     var animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
-    
-    /// True once the player has placed chips manually or via redo bet.
-    /// Require a user-placed flag + non-zero bet + chips to avoid post-round residue.
+
+    // ALWAYS show buttons when chip selection is visible - no other conditions
+    private var shouldShowButtons: Bool {
+        // Show when chip selection is visible OR results are showing
+        let chipSelectionVisible = !gameState.showNextHand
+        let showingResult = (gameState.resultMessage != nil && gameState.showResultNotification) || gameState.showPostGameButtons
+        return chipSelectionVisible || showingResult
+    }
+
     private var hasPlacedChip: Bool {
         gameState.userPlacedCurrentBet && gameState.playerBet > 0 && !gameState.betChips.isEmpty
     }
-    
-    private var dealButtonOpacity: Double {
-        hasPlacedChip ? 1.0 : 0.2
+    private var dealButtonOpacity: Double { hasPlacedChip ? 1.0 : 0.2 }
+    private var dealButtonSaturation: Double { hasPlacedChip ? 1.0 : 0.0 }
+
+    // Only hide during active gameplay (dealing cards or player turn with cards)
+    // Dealer turn is handled separately - only hide if round is still in progress (showNextHand is true)
+    private var isActiveGameplay: Bool {
+        (gameState.isDealing && gameState.playerHand.count >= 2) || 
+        (gameState.isPlayerTurn && gameState.playerHand.count >= 2) ||
+        gameState.isProcessingAction
     }
     
-    private var dealButtonSaturation: Double {
-        hasPlacedChip ? 1.0 : 0.0
+    // Hide buttons during dealer's turn ONLY if round is still in progress (showNextHand is true)
+    // After round ends (showNextHand is false), show buttons regardless of dealer turn status
+    private var dealerTurnInProgress: Bool {
+        gameState.showNextHand && !gameState.dealerHand.isEmpty && !gameState.isPlayerTurn && !gameState.isDealing
     }
-    
+
     var body: some View {
-        ZStack {
-            VStack(spacing: 8) {
-                if gameState.lastBet != nil && (gameState.resultMessage != nil || gameState.showResultNotification == false) {
-                HStack(spacing: 16) {
+        if shouldShowButtons && !isActiveGameplay && !dealerTurnInProgress {
+            HStack(spacing: 16) {
+                if gameState.lastBet != nil {
                     Button(action: {
                         bettingManager.redoBet(gameState: gameState)
                     }) {
                         ZStack {
-                            // Custom asset background
                             Image("RedoBetButton")
                                 .renderingMode(.original)
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 150, height: 60)
                                 .colorMultiply(bettingManager.canRedoBet(gameState: gameState) ? Color.white : Color.gray)
-                            
-                            // Text overlay
                             Text("Redo Bet")
                                 .font(.fixedSystem(size: 20, weight: .bold))
                                 .foregroundColor(.white)
                         }
                     }
                     .disabled(!bettingManager.canRedoBet(gameState: gameState))
-                    
-                    Button(action: {
-                        if gameState.isDealing { return }
-                        gameState.isDealing = true // Lock UI immediately to prevent double deal
-                        
-                        // Clear payout and double down chips - keep only original bet
-                        print("🎯 DEAL: Clearing payout and DD chips. Original bet: \(gameState.playerBet)")
-                        gameState.additionalBetChips = []
-                        gameState.doubleDownChipsHand1 = []
-                        gameState.doubleDownChipsHand2 = []
-                        
-                        // Keep only the original bet amount in betChips
-                        let originalBet = gameState.playerBet
-                        gameState.betChips = []
-                        
-                        // Rebuild betChips array with optimal chip denominations
-                        var remaining = originalBet
-                        let chipDenominations = [100, 50, 25, 5, 1]
-                        for denom in chipDenominations {
-                            while remaining >= denom {
-                                gameState.betChips.append(denom)
-                                remaining -= denom
-                            }
-                        }
-                        
-                        print("🎯 DEAL: After - betChips: \(gameState.betChips), playerBet: \(gameState.playerBet)")
-                        
-                        // Clear win/lose notification and post-game buttons when dealing starts in training mode
-                        let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-                        if trainingModeEnabled {
-                            print("🎓 Training Mode: Clearing result message and post-game buttons when dealing starts")
-                            gameState.resultMessage = nil
-                            gameState.showPostGameButtons = false
-                            gameState.showResultNotification = true // Reset notification flag for next game
-                        }
-                        
-                        // Check if we're in RegularModeView (deck position is set)
-                        let useRegularAnimation = gameState.deckPosition != .zero
-                        gameEngine.dealInitialCards(
-                            gameState: gameState, 
-                            useRegularModeAnimation: useRegularAnimation,
-                            animationCallback: animationCallback
-                        )
-                    }) {
-                        ZStack {
-                            // Custom asset background
-                            Image("DealButton2")
-                                .renderingMode(.original)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 150, height: 60)
-                                .colorMultiply(hasPlacedChip ? Color.white : Color.gray)
-                                .saturation(dealButtonSaturation)
-                            
-                            // Text overlay
-                            Text("Deal Cards")
-                                .font(.fixedSystem(size: 20, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                        .opacity(dealButtonOpacity)
-                    }
-                    .disabled(!hasPlacedChip || gameState.isCollectingPhase)
                 }
-                .frame(maxWidth: 440)
-                .padding(.horizontal)
-            } else if (gameState.resultMessage != nil || (!gameState.showNextHand && gameState.playerHand.isEmpty && gameState.dealerHand.isEmpty)) {
-                // Keep Deal Cards visible but dim it until a chip is placed or redo bet is used
+
                 Button(action: {
-                    if gameState.isDealing || gameState.isCollectingPhase { return }
-                    
-                    print("🎯 DealNextHandButtons: Button clicked, playerBet = \(gameState.playerBet)")
-                    
-                    gameState.isDealing = true // Lock UI immediately to prevent double deal
-                    
-                    // Clear payout and double down chips - keep only original bet
-                    print("🎯 DEAL: Clearing payout and DD chips. Original bet: \(gameState.playerBet)")
-                    print("🎯 DEAL: Before - betChips: \(gameState.betChips), additionalBetChips: \(gameState.additionalBetChips)")
-                    print("🎯 DEAL: Before - doubleDownChipsHand1: \(gameState.doubleDownChipsHand1), doubleDownChipsHand2: \(gameState.doubleDownChipsHand2)")
-                    
-                    // Clear additional chips (these are from split/DD/payouts)
+                    if gameState.isDealing { return }
+                    gameState.isDealing = true
+
                     gameState.additionalBetChips = []
                     gameState.doubleDownChipsHand1 = []
                     gameState.doubleDownChipsHand2 = []
-                    
-                    // Keep only the original bet amount in betChips
+
                     let originalBet = gameState.playerBet
                     gameState.betChips = []
-                    
-                    // Rebuild betChips array with optimal chip denominations
                     var remaining = originalBet
                     let chipDenominations = [100, 50, 25, 5, 1]
                     for denom in chipDenominations {
@@ -442,37 +387,29 @@ struct DealNextHandButtons: View {
                             remaining -= denom
                         }
                     }
-                    
-                    print("🎯 DEAL: After - betChips: \(gameState.betChips), playerBet: \(gameState.playerBet)")
-                    
-                    // Clear win/lose notification and post-game buttons when dealing starts in training mode
+
                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                     if trainingModeEnabled {
-                        print("🎓 Training Mode: Clearing result message and post-game buttons when dealing starts")
                         gameState.resultMessage = nil
                         gameState.showPostGameButtons = false
-                        gameState.showResultNotification = true // Reset notification flag for next game
+                        gameState.showResultNotification = true
                     }
-                    
-                    // Check if we're in RegularModeView (deck position is set)
+
                     let useRegularAnimation = gameState.deckPosition != .zero
                     gameEngine.dealInitialCards(
-                        gameState: gameState, 
+                        gameState: gameState,
                         useRegularModeAnimation: useRegularAnimation,
                         animationCallback: animationCallback
                     )
                 }) {
-                        ZStack {
-                        // Custom asset background
-                        Image("DealButton1")
+                    ZStack {
+                        Image("DealButton2")
                             .renderingMode(.original)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 250, height: 48)
-                                .colorMultiply((hasPlacedChip && !gameState.isCollectingPhase) ? Color.white : Color.gray)
-                                .saturation(dealButtonSaturation)
-                        
-                        // Text overlay
+                            .frame(width: 150, height: 60)
+                            .colorMultiply(hasPlacedChip ? Color.white : Color.gray)
+                            .saturation(dealButtonSaturation)
                         Text("Deal Cards")
                             .font(.fixedSystem(size: 20, weight: .bold))
                             .foregroundColor(.white)
@@ -480,15 +417,12 @@ struct DealNextHandButtons: View {
                     .opacity(dealButtonOpacity)
                 }
                 .disabled(!hasPlacedChip || gameState.isCollectingPhase)
-                .padding(.horizontal)
             }
-            }
-            
-            // Notification is now handled by the parent view (TrainingModeView/RegularModeView)
+            .frame(maxWidth: 440)
+            .padding(.horizontal)
         }
     }
 }
-
 // MARK: - ChipView
 struct ChipView: View {
     let chip: Chip
