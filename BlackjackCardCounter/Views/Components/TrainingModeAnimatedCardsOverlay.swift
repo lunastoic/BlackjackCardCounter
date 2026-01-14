@@ -28,6 +28,10 @@ struct TrainingModeAnimatedCardsOverlay: View {
     // Split state
     let isSplit: Bool
     
+    // Training-specific offsets
+    let playerCardYOffset: CGFloat
+    let dealerCardYOffset: CGFloat
+    
     var body: some View {
         ZStack {
             // Animated cards overlay
@@ -90,7 +94,7 @@ struct TrainingModeAnimatedCardsOverlay: View {
                         isDealing: false // This should be passed as parameter if needed
                     )
                     let computedY = CardPositioning.yForHand(isPlayer: false, size: tableSize)
-                    let pos = finalDealerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)
+                    let pos = finalDealerPositions[card.id] ?? CGPoint(x: computedX, y: computedY + dealerCardYOffset)
 
                     TrainingModeFlipCardView(
                         card: card,
@@ -122,7 +126,7 @@ struct TrainingModeAnimatedCardsOverlay: View {
                             isDealing: false // This should be passed as parameter if needed
                         )
                         let computedY = CardPositioning.yForHand(isPlayer: true, size: tableSize)
-                        let pos = finalPlayerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)
+                        let pos = finalPlayerPositions[card.id] ?? CGPoint(x: computedX, y: computedY + playerCardYOffset)
 
                         TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8)
                             .matchedGeometryEffect(id: card.id, in: mgCards)

@@ -285,6 +285,15 @@ class BlackjackGameEngine: ObservableObject {
         gameState.lastActionTime = now
         print("🎲 Double Down Regular: Processing locked at \(now)")
         
+        // Check max bet: after doubling, total bet should be <= 2x max bet
+        // Since we're doubling, current bet must be <= max bet
+        let wouldExceedMaxBet = gameState.playerBet > gameState.maxBet
+        if wouldExceedMaxBet {
+            print("🎲 Double Down Regular: BLOCKED - current bet \(gameState.playerBet) exceeds max bet \(gameState.maxBet)")
+            gameState.isProcessingAction = false
+            return
+        }
+        
         if gameState.deck.count > 0,
            gameState.playerHand.count == 2,
            gameState.playerBet <= XPChipManager.shared.userChips {
@@ -393,6 +402,19 @@ class BlackjackGameEngine: ObservableObject {
         }
         
         let activeHandBet = gameState.splitHandBets[gameState.activeHandIndex]
+        
+        // Check max bet: after doubling this hand, total bet should be <= 4x max bet (if both hands doubled)
+        // For a single hand double down, check that this hand's bet <= max bet
+        let wouldExceedMaxBet = activeHandBet > gameState.maxBet
+        if wouldExceedMaxBet {
+            print("🎲 Double Down Split: BLOCKED - hand bet \(activeHandBet) exceeds max bet \(gameState.maxBet)")
+            gameState.isProcessingAction = false
+            gameState.animatingCards.removeAll()
+            gameState.animatingCardPositions.removeAll()
+            gameState.cardFlipRotations.removeAll()
+            return
+        }
+        
         guard activeHandBet <= XPChipManager.shared.userChips else {
             print("🎲 Double Down Split: Not enough chips. Need: \(activeHandBet), Have: \(XPChipManager.shared.userChips)")
             // Unlock processing on chip validation failure
@@ -521,6 +543,14 @@ class BlackjackGameEngine: ObservableObject {
         
         let hasEnoughChips = gameState.playerBet <= XPChipManager.shared.userChips
         let hasValidCards = gameState.canSplitCards(card1: gameState.playerHand[0], card2: gameState.playerHand[1])
+        
+        // Check max bet: after splitting, total bet will be 2x current bet, which should be <= 2x max bet
+        // So current bet must be <= max bet
+        let wouldExceedMaxBet = gameState.playerBet > gameState.maxBet
+        if wouldExceedMaxBet {
+            print("🃏 Split: BLOCKED - current bet \(gameState.playerBet) exceeds max bet \(gameState.maxBet)")
+            return
+        }
         
         print("🃏 🟡 splitAction CHIP CHECK: need \(gameState.playerBet), have \(XPChipManager.shared.userChips), RESULT: \(hasEnoughChips ? "PASS" : "FAIL")")
         print("🃏 🟡 splitAction validation: handCount=\(gameState.playerHand.count), hasEnough=\(hasEnoughChips), validCards=\(hasValidCards)")
@@ -1128,7 +1158,10 @@ class BlackjackGameEngine: ObservableObject {
             switch i {
             case 0:
                 gameState.playerHand.append(card)
-                gameState.hasEverDealtCards = true // Mark that cards have been dealt
+                
+                // Chips are already minimized in the "Deal Cards" button action
+                // No need to minimize again here - just proceed with dealing
+                
                 if useRegularModeAnimation, let cb = animationCallback { cb(card, i) { gameState.dealtPlayerCards.append(card) } }
                 else { withAnimation(.easeOut(duration: 0.3)) { gameState.dealtPlayerCards.append(card) } }
 

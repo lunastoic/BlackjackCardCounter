@@ -5,6 +5,11 @@ struct SettingsView: View {
     @AppStorage("dealerSpeed") private var dealerSpeed = 1.0
     @AppStorage("vibrationEnabled") private var vibrationEnabled = true
     @AppStorage("forcedBlackjacks") private var forcedBlackjacks = false
+    @ObservedObject private var xpManager = XPChipManager.shared
+    
+    @State private var resetMapsPressed = false
+    @State private var removeLevelsPressed = false
+    @State private var addLevelsPressed = false
     
     var body: some View {
         ZStack {
@@ -61,6 +66,9 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Button(action: {
                                 // Reset maps to locked state (only first map unlocked)
+                                withAnimation(.easeInOut(duration: 0.1)) {
+                                    resetMapsPressed = false
+                                }
                                 UserDefaults.standard.set("1", forKey: "unlockedMaps")
                             }) {
                                 HStack {
@@ -78,10 +86,120 @@ struct SettingsView: View {
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .scaleEffect(resetMapsPressed ? 0.95 : 1.0)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in
+                                        if !resetMapsPressed {
+                                            withAnimation(.easeInOut(duration: 0.1)) {
+                                                resetMapsPressed = true
+                                            }
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        withAnimation(.easeInOut(duration: 0.1)) {
+                                            resetMapsPressed = false
+                                        }
+                                    }
+                            )
                             
                             Text("⚠️ This will lock all maps except the first one")
                                 .font(.caption)
                                 .foregroundColor(.red.opacity(0.8))
+                            
+                            // Remove 5 Levels Button (Debug)
+                            Button(action: {
+                                // Remove 5 levels, but ensure level doesn't go below 1
+                                withAnimation(.easeInOut(duration: 0.1)) {
+                                    removeLevelsPressed = false
+                                }
+                                let newLevel = max(1, xpManager.userLevel - 5)
+                                xpManager.userLevel = newLevel
+                                // Reset XP to 0 when removing levels
+                                xpManager.userXP = 0
+                            }) {
+                                HStack {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Remove 5 Levels (Debug)")
+                                        .foregroundColor(.orange)
+                                        .fontWeight(.medium)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.orange, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .scaleEffect(removeLevelsPressed ? 0.95 : 1.0)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in
+                                        if !removeLevelsPressed {
+                                            withAnimation(.easeInOut(duration: 0.1)) {
+                                                removeLevelsPressed = true
+                                            }
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        withAnimation(.easeInOut(duration: 0.1)) {
+                                            removeLevelsPressed = false
+                                        }
+                                    }
+                            )
+                            
+                            Text("⚠️ Removes 5 levels from your current level (minimum level 1)")
+                                .font(.caption)
+                                .foregroundColor(.orange.opacity(0.8))
+                            
+                            // Add 5 Levels Button (Debug)
+                            Button(action: {
+                                // Add 5 levels, but ensure level doesn't exceed max level (25)
+                                withAnimation(.easeInOut(duration: 0.1)) {
+                                    addLevelsPressed = false
+                                }
+                                let newLevel = min(25, xpManager.userLevel + 5)
+                                xpManager.userLevel = newLevel
+                                // Reset XP to 0 when adding levels
+                                xpManager.userXP = 0
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Add 5 Levels (Debug)")
+                                        .foregroundColor(.blue)
+                                        .fontWeight(.medium)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.blue, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .scaleEffect(addLevelsPressed ? 0.95 : 1.0)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in
+                                        if !addLevelsPressed {
+                                            withAnimation(.easeInOut(duration: 0.1)) {
+                                                addLevelsPressed = true
+                                            }
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        withAnimation(.easeInOut(duration: 0.1)) {
+                                            addLevelsPressed = false
+                                        }
+                                    }
+                            )
+                            
+                            Text("⚠️ Adds 5 levels to your current level (maximum level 25)")
+                                .font(.caption)
+                                .foregroundColor(.blue.opacity(0.8))
                             
                             Divider()
                                 .background(Color.white.opacity(0.3))
@@ -154,14 +272,14 @@ struct SettingsView: View {
                                 .background(Color.white.opacity(0.3))
                                 .padding(.vertical, 5)
                             
-                            // Add 3000 Chips Button for Testing
+                            // Add 10000 Chips Button for Testing
                             Button(action: {
-                                XPChipManager.shared.updateChips(3000)
+                                XPChipManager.shared.updateChips(10000)
                             }) {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
                                         .foregroundColor(.green)
-                                    Text("Add 3000 Chips (Testing)")
+                                    Text("Add 10000 Chips (Testing)")
                                         .foregroundColor(.green)
                                         .fontWeight(.medium)
                                 }
@@ -174,7 +292,7 @@ struct SettingsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            Text("💰 Adds 3000 chips to your current balance for testing")
+                            Text("💰 Adds 10000 chips to your current balance for testing")
                                 .font(.caption)
                                 .foregroundColor(.green.opacity(0.8))
                         }

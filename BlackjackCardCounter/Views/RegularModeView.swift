@@ -43,8 +43,8 @@ struct RegularModeView: View {
     var body: some View {
         GeometryReader { tableGeo in
         ZStack {
-            // Background
-            Image("GreenSuede")
+            // Background - use map's table texture or default to GreenSuede
+            Image(map.assetConfig.tableTexture ?? "GreenSuede")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
@@ -54,7 +54,7 @@ struct RegularModeView: View {
             GeometryReader { geo in
                 ZStack {
                     createArchedText(
-                            text: "Luna Luxe Casino", fontSize: 36,
+                            text: map.name, fontSize: 36,
                             width: geo.size.width * 0.8, height: 80,
                             centerX: geo.size.width / 2, centerY: geo.size.height / 2 - 175
                     )
@@ -71,6 +71,17 @@ struct RegularModeView: View {
                     }.allowsHitTesting(false)
             }
             .zIndex(0)
+            .onAppear {
+                // Set max bet and map from map when view appears
+                if gameState.maxBet != map.maxBet {
+                    gameState.maxBet = map.maxBet
+                }
+                if gameState.currentMap?.id != map.id {
+                    gameState.currentMap = map
+                    // Filter out any chips that don't exist in the new map's configuration
+                    BlackjackBettingManager.filterInvalidChipsForMap(gameState: gameState, map: map)
+                }
+            }
             
             VStack(spacing: 0) {
                 GameHeaderView()
@@ -110,7 +121,7 @@ struct RegularModeView: View {
                                 .offset(x: -30) // Shift "Deck" text 30 points to the left to match
                             }
                             
-                            CardCounterView(gameState: gameState)
+                            CardCounterView(gameState: gameState, maxBet: map.maxBet)
                         }
                         
                         Spacer()
@@ -770,25 +781,40 @@ struct RegularModeView: View {
     }
     
     /// Renders a single spiral stack with the same stacking logic used in animations.
+    /// Simplified during gameplay to prevent lag with large bets.
     private func chipStackView(for chips: [Int]) -> some View {
         ZStack {
-            ForEach(Array(chips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
-                let angle = Double(index) * 0.8
-                let radius: CGFloat = 2.0
-                let xOffset = radius * cos(angle)
-                let yOffset = radius * sin(angle)
-                
-                ChipView(chip: Chip(value: chipValue))
-                    .offset(x: xOffset, y: yOffset)
-                    .zIndex(Double(index))
-                    .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
-                    .transition(.identity)
-                    .transaction { $0.animation = nil }
+            // CRITICAL: Check displayChip FIRST - if set, show it (even if flags aren't set yet)
+            // This prevents any gap where nothing is shown
+            if let displayChip = gameState.displayChip,
+               let map = gameState.currentMap,
+               map.assetConfig.chipImages.keys.contains(displayChip),
+               gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation {
+                // During gameplay: Show ONLY displayChip
+                ChipView(chip: Chip(value: displayChip), gameState: gameState)
+                    .opacity(1)
                     .allowsHitTesting(false)
+            } else if !gameState.hasEverDealtCards {
+                // Before dealing: Show stacked chips
+                // Before dealing: Show stacked chips (top chip is visible)
+                // Before dealing: Show stacked chips
+                ForEach(Array(chips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
+                    let angle = Double(index) * 0.8
+                    let radius: CGFloat = 2.0
+                    let xOffset = radius * cos(angle)
+                    let yOffset = radius * sin(angle)
+                    
+                    ChipView(chip: Chip(value: chipValue), gameState: gameState)
+                        .offset(x: xOffset, y: yOffset)
+                        .zIndex(Double(index))
+                        .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : (gameState.isTransitioningChips ? 0 : 1))
+                        .scaleEffect(gameState.isTransitioningChips ? 0.8 : 1.0)
+                        .animation(.easeInOut(duration: 0.4), value: gameState.isTransitioningChips)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .frame(height: 60)
-        .animation(.none, value: chips.count)
     }
 
     // MARK: - Layout helpers (now using shared CardPositioning)
@@ -1086,6 +1112,6 @@ struct RegularModeSettingsTabView: View {
 
 
 #Preview {
-    RegularModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1))
+    RegularModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1, maxBet: 1_000))
 } 
 

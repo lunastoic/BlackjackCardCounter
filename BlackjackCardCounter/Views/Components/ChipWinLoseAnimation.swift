@@ -35,7 +35,7 @@ struct ChipWinLoseAnimation: View {
                         .fill(debugColors[index % debugColors.count])
                         .frame(width: 44, height: 44)
                         .opacity(1.0)
-                    ChipView(chip: Chip(value: chip.value))
+                    ChipView(chip: Chip(value: chip.value), gameState: gameState)
                 }
                     .position(
                         x: chip.position.x - frame.minX,
@@ -53,7 +53,7 @@ struct ChipWinLoseAnimation: View {
                         .fill(debugColors[index % debugColors.count])
                         .frame(width: 44, height: 44)
                         .opacity(1.0)
-                    ChipView(chip: Chip(value: chip.value))
+                    ChipView(chip: Chip(value: chip.value), gameState: gameState)
                 }
                     .position(
                         x: chip.position.x - frame.minX,
@@ -1988,7 +1988,7 @@ struct ChipWinLoseAnimation: View {
         let payoutX: CGFloat = (trainingModeEnabled && gameState.isSplit) ? (centerX - 120) : (centerX - 60)
         
         // Create chips for main stack payout
-        for (index, chipValue) in gameState.betChips.enumerated() {
+        for (_, chipValue) in gameState.betChips.enumerated() {
             let winChip = AnimatedChip(
                 id: UUID(),
                 value: chipValue,
@@ -2056,7 +2056,7 @@ struct ChipWinLoseAnimation: View {
         }()
         
         // Create chips for additional stack payout
-        for (index, chipValue) in gameState.additionalBetChips.enumerated() {
+        for (_, chipValue) in gameState.additionalBetChips.enumerated() {
             let winChip = AnimatedChip(
                 id: UUID(),
                 value: chipValue,

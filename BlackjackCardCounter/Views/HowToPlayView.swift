@@ -145,5 +145,5 @@ struct TipItem: View {
 }
 
 #Preview {
-    TrainingModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1))
+    TrainingModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1, maxBet: 1_000))
 } 

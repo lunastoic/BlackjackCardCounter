@@ -437,6 +437,6 @@ struct QuizModeView: View {
 
 #Preview {
     NavigationView {
-        GameModeSelectionView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1))
+        GameModeSelectionView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1, maxBet: 1_000))
     }
 } 

@@ -54,30 +54,41 @@ struct BlackjackBettingView: View {
                             .allowsHitTesting(false)
                     }
 
-                    // Main bet chips centered - simple offset when chips are present
+                    // Main bet chips centered - simplified during gameplay to prevent lag
                     ZStack {
-                        ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
-                            // Spiral ALL chips in one stack: highest value at bottom, smallest at top
-                            let angle = Double(index) * 0.8  // Tighter spiral
-                            let radius: CGFloat = 2.0        // Closer stacking
-                            let xOffset = radius * cos(angle)
-                            let yOffset = radius * sin(angle)
+                        // CRITICAL: Check displayChip FIRST - if set, show it (even if flags aren't set yet)
+                        // This prevents any gap where nothing is shown
+                        if let displayChip = gameState.displayChip,
+                           let map = gameState.currentMap,
+                           map.assetConfig.chipImages.keys.contains(displayChip),
+                           gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation {
+                            // During gameplay: Show ONLY displayChip
+                            ChipView(chip: Chip(value: displayChip), gameState: gameState)
+                                .opacity(1)
+                                .allowsHitTesting(false)
+                        } else if !gameState.hasEverDealtCards {
+                            // Before dealing: Show stacked chips
+                            // Before dealing: Show stacked chips - show largest chip on top
+                            ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
+                                // Spiral ALL chips in one stack: highest value at bottom, smallest at top
+                                let angle = Double(index) * 0.8  // Tighter spiral
+                                let radius: CGFloat = 2.0        // Closer stacking
+                                let xOffset = radius * cos(angle)
+                                let yOffset = radius * sin(angle)
 
-                            ZStack {
-                                Circle()
-                                    .fill(debugColors[index % debugColors.count])
-                                    .frame(width: 44, height: 44)
-                                ChipView(chip: Chip(value: chipValue))
+                                ZStack {
+                                    Circle()
+                                        .fill(debugColors[index % debugColors.count])
+                                        .frame(width: 44, height: 44)
+                                    ChipView(chip: Chip(value: chipValue), gameState: gameState)
+                                }
+                                    .offset(x: xOffset, y: yOffset)
+                                    .zIndex(20000 + Double(index)) // force overlay above chips
+                                    .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
+                                    .allowsHitTesting(false) // Disable interaction with betting chips
                             }
-                                .offset(x: xOffset, y: yOffset)
-                                .zIndex(20000 + Double(index)) // force overlay above chips
-                                .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1) // Hide with opacity instead of removing
-                                .transition(.identity) // No transition animations
-                                .transaction { $0.animation = nil } // Completely disable all animations
-                                .allowsHitTesting(false) // Disable interaction with betting chips
                         }
                     }
-                    .transaction { $0.animation = nil } // Completely disable all animations
                     .offset(y: !gameState.betChips.isEmpty ? 10 : 0) // Move down 10 points when chips are placed
                     .background(
                         GeometryReader { geometry in
@@ -121,7 +132,7 @@ struct BlackjackBettingView: View {
                                     Circle()
                                         .fill(debugColors[index % debugColors.count])
                                         .frame(width: 44, height: 44)
-                                    ChipView(chip: Chip(value: chipValue))
+                                    ChipView(chip: Chip(value: chipValue), gameState: gameState)
                                 }
                                     .offset(x: xOffset, y: yOffset)
                                     .zIndex(20000 + Double(index))
@@ -229,11 +240,19 @@ struct ChipSelectionView: View {
     let bettingManager: BlackjackBettingManager
     @State private var pressedChip: Int? = nil
     
-    private let playerChips = [1, 5, /* 10, */ 25, 50, 100]
+    // Get available chip denominations from map's configuration, sorted ascending
+    private var availableChips: [Int] {
+        if let map = gameState.currentMap {
+            // Get chip values from map's configuration and sort them
+            return Array(map.assetConfig.chipImages.keys).sorted()
+        }
+        // Fallback to default chips if no map is set
+        return [1, 5, 25, 50, 100]
+    }
     
     var body: some View {
         HStack(spacing: 16) {
-            ForEach(playerChips, id: \.self) { value in
+            ForEach(availableChips, id: \.self) { value in
                 Button(action: {
                     print("🎰 Chip \(value) tapped")
                     // Add visual feedback
@@ -244,7 +263,7 @@ struct ChipSelectionView: View {
                     }
                     bettingManager.placeBet(gameState: gameState, chipValue: value)
                 }) {
-                    ChipView(chip: Chip(value: value))
+                    ChipView(chip: Chip(value: value), gameState: gameState)
                         .scaleEffect(pressedChip == value ? 0.9 : 1.0)
                         .overlay(
                             RoundedRectangle(cornerRadius: 22)
@@ -362,22 +381,43 @@ struct DealNextHandButtons: View {
 
                 Button(action: {
                     if gameState.isDealing { return }
-                    gameState.isDealing = true
+                    
+                    // CRITICAL: Determine chip to display BEFORE any state changes
+                    // ALWAYS prefer originalLargestChip - this is what user actually placed
+                    // NEVER use betChips.max() as fallback - betChips might contain consolidated chips
+                    let chipToDisplay: Int?
+                    if let originalLargest = gameState.originalLargestChip,
+                       let map = gameState.currentMap,
+                       map.assetConfig.chipImages.keys.contains(originalLargest) {
+                        chipToDisplay = originalLargest
+                        print("💰 Deal Cards: Using originalLargestChip: $\(originalLargest)")
+                    } else if let map = gameState.currentMap {
+                        // Fallback to map's largest chip if originalLargestChip not set
+                        chipToDisplay = map.assetConfig.chipImages.keys.max()
+                        print("⚠️ Deal Cards: originalLargestChip not set! Using map's largest chip: $\(chipToDisplay ?? 0)")
+                    } else {
+                        chipToDisplay = nil
+                        print("⚠️ ERROR: Could not determine chip to display!")
+                    }
+                    
+                    // CRITICAL: Set displayChip FIRST, then flags - all in one atomic update
+                    // Use a transaction to prevent SwiftUI from rendering between state changes
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    
+                    withTransaction(transaction) {
+                        // Set displayChip FIRST - view checks this immediately
+                        gameState.displayChip = chipToDisplay
+                        
+                        // Set flags AFTER displayChip - view will now show displayChip
+                        gameState.chipsMinimized = true
+                        gameState.hasEverDealtCards = true
+                        gameState.isDealing = true
+                    }
 
                     gameState.additionalBetChips = []
                     gameState.doubleDownChipsHand1 = []
                     gameState.doubleDownChipsHand2 = []
-                    
-                    let originalBet = gameState.playerBet
-                    gameState.betChips = []
-                    var remaining = originalBet
-                    let chipDenominations = [100, 50, 25, 5, 1]
-                    for denom in chipDenominations {
-                        while remaining >= denom {
-                            gameState.betChips.append(denom)
-                            remaining -= denom
-                        }
-                    }
                     
                     let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
                     if trainingModeEnabled {
@@ -417,12 +457,39 @@ struct DealNextHandButtons: View {
 // MARK: - ChipView
 struct ChipView: View {
     let chip: Chip
+    let gameState: BlackjackGameState?
+    
+    init(chip: Chip, gameState: BlackjackGameState? = nil) {
+        self.chip = chip
+        self.gameState = gameState
+    }
+    
+    private var chipImageName: String {
+        // Try to get chip image from map's configuration
+        if let map = gameState?.currentMap {
+            if let imageName = map.assetConfig.chipImages[chip.value] {
+                return imageName
+            }
+            // CRITICAL: If chip doesn't exist in map's configuration, return empty string
+            // This prevents showing wrong chips (like Luna Luxe's Chip_100 in Io Inferno)
+            print("⚠️ ChipView: Chip value $\(chip.value) not found in map \(map.name) configuration")
+            return "" // Return empty to prevent showing wrong chip
+        }
+        // No map set - return empty to prevent showing default chips
+        print("⚠️ ChipView: No map set, cannot determine chip image")
+        return ""
+    }
     
     var body: some View {
-        Image("Chip_\(chip.value)")
-            .resizable()
-            .aspectRatio(1, contentMode: .fit)
-            .frame(width: 44, height: 44) // Increased size for better visibility
-            .shadow(radius: 3) // Increased shadow for better definition
+        Group {
+            if !chipImageName.isEmpty {
+                Image(chipImageName)
+                    .resizable()
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(width: 44, height: 44) // Increased size for better visibility
+                    .shadow(radius: 3) // Increased shadow for better definition
+            }
+            // If chipImageName is empty, show nothing (prevents wrong chips from appearing)
+        }
     }
 } 

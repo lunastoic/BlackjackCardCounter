@@ -4,6 +4,7 @@ struct CardCounterView: View {
     @ObservedObject var gameState: BlackjackGameState
     var xOffset: CGFloat = -24
     var yOffset: CGFloat = 400
+    var maxBet: Int? = nil // Optional max bet from map
     @AppStorage("regularDecks") private var regularDecks: Int = 6
     @AppStorage("trainingDecks") private var trainingDecks: Int = 6
     
@@ -14,6 +15,13 @@ struct CardCounterView: View {
         return decksCount * 52
     }
     
+    private var formattedMaxBet: String {
+        guard let maxBet = maxBet else { return "$1,000" } // Default fallback
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return "$\(formatter.string(from: NSNumber(value: maxBet)) ?? "\(maxBet)")"
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Cards dealt: \(gameState.cardsDealt)")
@@ -21,6 +29,10 @@ struct CardCounterView: View {
                 .foregroundColor(.white.opacity(0.5))
             
             Text("Cards remaining: \(totalCardsInDeck - gameState.cardsDealt)")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
+            
+            Text("Max bet: \(formattedMaxBet)")
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.5))
         }

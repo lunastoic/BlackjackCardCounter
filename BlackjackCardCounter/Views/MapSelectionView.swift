@@ -7,12 +7,12 @@ struct MapSelectionView: View {
     @AppStorage("unlockedMaps") private var unlockedMaps: String = "1" // 1 is always unlocked
     
     let maps: [Map] = [
-        Map(id: 1, name: "Luna Luxe Casino",       imageName: "RealLunaLuxe",  isLocked: false, requiredLevel: 1),
-        Map(id: 2, name: "Io Inferno Lounge",       imageName: "RealLounge",    isLocked: false, requiredLevel: 5),
-        Map(id: 3, name: "Europa Ice Palace",       imageName: "RealEuropa",    isLocked: false, requiredLevel: 10),
-        Map(id: 4, name: "Ganymede Grand",          imageName: "Ganymede",      isLocked: false, requiredLevel: 15),
-        Map(id: 5, name: "Titan Methane Mirage",    imageName: "TitanMethane",  isLocked: false, requiredLevel: 20),
-        Map(id: 6, name: "Kepler Fortune",          imageName: "Kepler", isLocked: false, requiredLevel: 25)
+        Map(id: 1, name: "Luna Luxe Casino",       imageName: "RealLunaLuxe",  isLocked: false, requiredLevel: 1, maxBet: 1_000),
+        Map(id: 2, name: "Io Inferno Lounge",       imageName: "RealLounge",    isLocked: false, requiredLevel: 5, maxBet: 5_000),
+        Map(id: 3, name: "Europa Ice Palace",       imageName: "RealEuropa",    isLocked: false, requiredLevel: 10, maxBet: 10_000),
+        Map(id: 4, name: "Ganymede Grand",          imageName: "Ganymede",      isLocked: false, requiredLevel: 15, maxBet: 50_000),
+        Map(id: 5, name: "Titan Methane Mirage",    imageName: "TitanMethane",  isLocked: false, requiredLevel: 20, maxBet: 250_000),
+        Map(id: 6, name: "Kepler Fortune",          imageName: "Kepler", isLocked: false, requiredLevel: 25, maxBet: 1_000_000)
     ]
     
     private func isUnlocked(_ map: Map) -> Bool {
@@ -126,9 +126,10 @@ struct MapCard: View {
     @State private var isUnlocking = false
     @State private var wasUnlocked = false
     @State private var localUnlocked = false
-    @State private var isShaking = false
+    @State private var shakeOffset: CGFloat = 0
     @State private var showUnlockAsset = false // Still used for local state if binding not provided
     @State private var unlockInProgress = false // Separate flag to prevent multiple taps
+    @State private var shakeInProgress = false // Flag to prevent multiple shake animations
 
     // For crisp hairline borders scaled to device pixels
     @Environment(\.displayScale) private var displayScale
@@ -280,9 +281,8 @@ struct MapCard: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 162, height: 162)
-                            .offset(x: isShaking ? 8 : 0)
+                                .offset(x: shakeOffset)
                                 .shadow(color: .white.opacity(0.8), radius: 20, x: 0, y: 0)
-                                .transaction { $0.animation = nil }
                         }
                     }
                     .frame(width: 162, height: 162)
@@ -294,6 +294,7 @@ struct MapCard: View {
                         guard !unlockInProgress else { return }
                         guard !isUnlocking else { return }
                         guard !showUnlockAsset else { return }
+                        guard !shakeInProgress else { return } // Prevent multiple shake animations
                         
                         if xpManager.userLevel >= map.requiredLevel {
                             // CRITICAL: Set ALL flags immediately to prevent any other taps
@@ -341,12 +342,48 @@ struct MapCard: View {
                                 }
                             }
                         } else {
-                            // Shake the lock to indicate insufficient level (left-right "no")
-                            withAnimation(.easeInOut(duration: 0.07).repeatCount(5, autoreverses: true)) {
-                                isShaking = true
+                            // Shake the lock to indicate insufficient level (smooth left-right "no" motion)
+                            // Prevent multiple shake animations from running simultaneously
+                            guard !shakeInProgress else { return }
+                            
+                            shakeInProgress = true
+                            let shakeAmount: CGFloat = 10.0
+                            
+                            // Reset to center
+                            shakeOffset = 0
+                            
+                            // Smooth shake sequence with optimized timing
+                            withAnimation(.easeOut(duration: 0.08)) {
+                                shakeOffset = -shakeAmount
                             }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                isShaking = false
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                                withAnimation(.easeInOut(duration: 0.08)) {
+                                    shakeOffset = shakeAmount
+                                }
+                            }
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                                withAnimation(.easeInOut(duration: 0.08)) {
+                                    shakeOffset = -shakeAmount
+                                }
+                            }
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                                withAnimation(.easeInOut(duration: 0.08)) {
+                                    shakeOffset = shakeAmount
+                                }
+                            }
+                            
+                            // Return to center with smooth spring and reset flag
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                    shakeOffset = 0
+                                }
+                                // Reset flag after animation completes
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    shakeInProgress = false
+                                }
                             }
                         }
                     }

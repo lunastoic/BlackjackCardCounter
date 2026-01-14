@@ -33,6 +33,10 @@ struct TrainingModeView: View {
     @State private var dealerHoleRevealed: Bool = false
     @State private var discardPile: [Card] = []
     
+    // Training-only vertical offsets to keep cards clear of count labels
+    private let trainingPlayerCardYOffset: CGFloat = 6
+    private let trainingDealerCardYOffset: CGFloat = 15
+    
     // MARK: - Chip Position Helpers
     private struct ChipPositions {
         let hand2BetXOffset: CGFloat
@@ -65,9 +69,9 @@ struct TrainingModeView: View {
                         Circle()
                             .fill(debugColors[index % debugColors.count])
                             .frame(width: chipSize, height: chipSize)
-                        ChipView(chip: Chip(value: chipValue))
+                        ChipView(chip: Chip(value: chipValue), gameState: gameState)
                     }
-                    .offset(x: offs.x, y: offs.y)
+                        .offset(x: offs.x, y: offs.y)
                     .zIndex(20000 + Double(index))
                     .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
                     .transition(.identity)
@@ -136,8 +140,8 @@ struct TrainingModeView: View {
     var body: some View {
         GeometryReader { tableGeo in
         ZStack {
-            // Background image - ensure it covers the entire screen
-            Image("GreenSuede")
+            // Background image - use map's table texture or default to GreenSuede
+            Image(map.assetConfig.tableTexture ?? "GreenSuede")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
@@ -206,9 +210,9 @@ struct TrainingModeView: View {
             // Background text - arched like a rainbow (behind everything)
             GeometryReader { geo in
                 ZStack {
-                    // "Luna Luxe Casino" - top arc (matching RegularModeView)
+                    // Map name - top arc (matching RegularModeView)
                     createArchedText(
-                        text: "Luna Luxe Casino",
+                        text: map.name,
                         fontSize: 36,
                         width: geo.size.width * 0.8,
                         height: 80,
@@ -240,6 +244,17 @@ struct TrainingModeView: View {
                 .allowsHitTesting(false)
             }
             .zIndex(0)
+            .onAppear {
+                // Set max bet and map from map when view appears
+                if gameState.maxBet != map.maxBet {
+                    gameState.maxBet = map.maxBet
+                }
+                if gameState.currentMap?.id != map.id {
+                    gameState.currentMap = map
+                    // Filter out any chips that don't exist in the new map's configuration
+                    BlackjackBettingManager.filterInvalidChipsForMap(gameState: gameState, map: map)
+                }
+            }
             
             VStack(spacing: 0) {
                 // Game Header
@@ -268,7 +283,8 @@ struct TrainingModeView: View {
                      CardCounterView(
                          gameState: gameState,
                          xOffset: UIDevice.current.userInterfaceIdiom == .pad ? -330 : -154,
-                         yOffset: UIDevice.current.userInterfaceIdiom == .pad ? 510 : 443
+                         yOffset: UIDevice.current.userInterfaceIdiom == .pad ? 510 : 443,
+                         maxBet: map.maxBet
                      )
                 }
                 
@@ -467,14 +483,12 @@ struct TrainingModeView: View {
                 }
                 .onChange(of: gameState.playerHand.count) { handCount in
                     // Recalculate player card positions when hand count changes (like regular mode)
-                    CardPositioning.recalculateAllCardPositions(
+                    recalcTrainingCardPositions(
                         isPlayerCard: true,
                         newCount: handCount,
                         tableSize: tableSize,
                         dealtPlayerCards: gameState.dealtPlayerCards,
-                        dealtDealerCards: gameState.dealtDealerCards,
-                        finalPlayerPositions: &finalPlayerPositions,
-                        finalDealerPositions: &finalDealerPositions
+                        dealtDealerCards: gameState.dealtDealerCards
                     )
                     
                     // In training mode, keep visible count static to prevent layout shifts
@@ -807,8 +821,8 @@ struct TrainingModeView: View {
                             let midX = tableSize.width * 0.5
                             let startX = midX - (CardMetrics.cardSpacing / 2)
                             let x = startX + CGFloat(slotIndex) * CardMetrics.cardSpacing
-                            let y = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
-                            let destination = CGPoint(x: x, y: y)
+                            let baseY = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                            let destination = trainingAdjustedPosition(x: x, y: baseY, isPlayer: isPlayer)
 
                             if isPlayer { finalPlayerPositions[card.id] = destination }
                             else { finalDealerPositions[card.id] = destination }
@@ -855,7 +869,9 @@ struct TrainingModeView: View {
                 finalDealerPositions: finalDealerPositions,
                 tableSize: tableSize,
                 mgCards: mgCards,
-                isSplit: gameState.isSplit
+                isSplit: gameState.isSplit,
+                playerCardYOffset: trainingPlayerCardYOffset,
+                dealerCardYOffset: trainingDealerCardYOffset
             )
             .offset(y: gameState.isSplit ? 17 : 27) // Move up 10 points when split (27 - 10 = 17), otherwise 27 points down
             .allowsHitTesting(false)
@@ -1202,17 +1218,15 @@ struct TrainingModeView: View {
                 
                 let currentCount = isPlayerCard ? gameState.dealtPlayerCards.count : gameState.dealtDealerCards.count
                 let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize)
-                let y = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
-                let destination = CGPoint(x: x, y: y)
+                let baseY = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
+                let destination = trainingAdjustedPosition(x: x, y: baseY, isPlayer: isPlayerCard)
                 
-                CardPositioning.recalculateAllCardPositions(
+                recalcTrainingCardPositions(
                     isPlayerCard: isPlayerCard,
                     newCount: currentCount + 1,
                     tableSize: tableSize,
                     dealtPlayerCards: gameState.dealtPlayerCards,
-                    dealtDealerCards: gameState.dealtDealerCards,
-                    finalPlayerPositions: &finalPlayerPositions,
-                    finalDealerPositions: &finalDealerPositions
+                    dealtDealerCards: gameState.dealtDealerCards
                 )
 
                 CardAnimator.animateHit(
@@ -1332,6 +1346,31 @@ struct TrainingModeView: View {
     }
     
     // MARK: - Layout helpers (now using shared CardPositioning)
+    private func trainingAdjustedPosition(x: CGFloat, y: CGFloat, isPlayer: Bool) -> CGPoint {
+        CGPoint(x: x, y: y + (isPlayer ? trainingPlayerCardYOffset : trainingDealerCardYOffset))
+    }
+    
+    private func recalcTrainingCardPositions(
+        isPlayerCard: Bool,
+        newCount: Int,
+        tableSize: CGSize,
+        dealtPlayerCards: [Card],
+        dealtDealerCards: [Card]
+    ) {
+        if isPlayerCard {
+            for (index, card) in dealtPlayerCards.enumerated() {
+                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize)
+                let y = CardPositioning.yForHand(isPlayer: true, size: tableSize) + trainingPlayerCardYOffset
+                finalPlayerPositions[card.id] = CGPoint(x: x, y: y)
+            }
+        } else {
+            for (index, card) in dealtDealerCards.enumerated() {
+                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize)
+                let y = CardPositioning.yForHand(isPlayer: false, size: tableSize) + trainingDealerCardYOffset
+                finalDealerPositions[card.id] = CGPoint(x: x, y: y)
+            }
+        }
+    }
     
     // MARK: - Labels (from regular mode)
     private func playerValueLabel() -> String {
@@ -1552,8 +1591,8 @@ struct TrainingModeView: View {
                 let midX = tableSize.width * 0.5
                 let startX = midX - (CardMetrics.cardSpacing / 2)
                 let x = startX + CGFloat(slotIndex) * CardMetrics.cardSpacing
-                let y = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
-                let destination = CGPoint(x: x, y: y)
+                let baseY = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                let destination = trainingAdjustedPosition(x: x, y: baseY, isPlayer: isPlayer)
 
                 if isPlayer { finalPlayerPositions[card.id] = destination }
                 else { finalDealerPositions[card.id] = destination }
@@ -1949,7 +1988,7 @@ struct SettingsTabView: View {
 // Note: AchievementsTabView moved to GameAchievements.swift
 
 #Preview {
-    TrainingModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1))
+    TrainingModeView(map: Map(id: 1, name: "Mercury", imageName: "MercuryImage", isLocked: false, requiredLevel: 1, maxBet: 1_000))
 }
 
 // Custom extension for rounding specific corners
@@ -2037,25 +2076,39 @@ struct BettingAreaView: View {
                 .frame(height: 24)
                 .padding(.top, 12)
             
-            // Spiral Chip Stack
+            // Spiral Chip Stack - Simplified during gameplay to prevent lag
             ZStack {
-                ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
-                    let angle = Double(index) * 0.8
-                    let radius: CGFloat = 2.0
-                    let xOffset = radius * cos(angle)
-                    let yOffset = radius * sin(angle)
-                    
-                    ChipView(chip: Chip(value: chipValue))
-                        .offset(x: xOffset, y: yOffset)
-                        .zIndex(Double(index))
-                        .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
-                        .transition(.identity)
-                        .transaction { $0.animation = nil }
+                // CRITICAL: Check displayChip FIRST - if set, show it (even if flags aren't set yet)
+                // This prevents any gap where nothing is shown
+                if let displayChip = gameState.displayChip,
+                   let map = gameState.currentMap,
+                   map.assetConfig.chipImages.keys.contains(displayChip),
+                   gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation {
+                    // During gameplay: Show ONLY displayChip
+                    ChipView(chip: Chip(value: displayChip), gameState: gameState)
+                        .opacity(1)
                         .allowsHitTesting(false)
+                } else if !gameState.hasEverDealtCards {
+                    // Before dealing: Show stacked chips
+                    // Before dealing: Show stacked chips (top chip is visible)
+                    // Before dealing: Show stacked chips
+                    ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
+                        let angle = Double(index) * 0.8
+                        let radius: CGFloat = 2.0
+                        let xOffset = radius * cos(angle)
+                        let yOffset = radius * sin(angle)
+                        
+                        ChipView(chip: Chip(value: chipValue), gameState: gameState)
+                            .offset(x: xOffset, y: yOffset)
+                            .zIndex(Double(index))
+                            .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : (gameState.isTransitioningChips ? 0 : 1))
+                            .scaleEffect(gameState.isTransitioningChips ? 0.8 : 1.0)
+                            .animation(.easeInOut(duration: 0.4), value: gameState.isTransitioningChips)
+                            .allowsHitTesting(false)
+                    }
                 }
             }
             .frame(height: 60)
-            .transaction { $0.animation = nil }
             
             // Bet Amount Text with Return Bet Button
             ZStack {

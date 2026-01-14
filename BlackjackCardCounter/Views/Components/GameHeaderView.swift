@@ -14,6 +14,18 @@ struct GameHeaderView: View {
         }
     }
     
+    // Format chip count with commas for readability
+    private var formattedChipCount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: xpManager.userChips)) ?? "\(xpManager.userChips)"
+    }
+    
+    // Dynamic font size based on chip count
+    private var chipCountFontSize: CGFloat {
+        xpManager.userChips >= 100_000 ? 16 : 20
+    }
+    
     var body: some View {
         HStack {
             // Chips Counter
@@ -21,9 +33,11 @@ struct GameHeaderView: View {
                 Text("Chips:")
                     .font(.fixedSystem(size: 19, weight: .bold))
                     .foregroundColor(.yellow)
-                Text("\(xpManager.userChips)")
-                    .font(.fixedSystem(size: 20, weight: .bold))
+                Text(formattedChipCount)
+                    .font(.fixedSystem(size: chipCountFontSize, weight: .bold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

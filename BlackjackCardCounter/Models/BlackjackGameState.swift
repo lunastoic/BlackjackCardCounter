@@ -26,10 +26,13 @@ class BlackjackGameState: ObservableObject {
     @Published var runningCount: Int = 0
     @Published var isTrainingMode: Bool = false
     @Published var numberOfDecks: Int = 0
+    @Published var currentMap: Map? = nil // Current map for asset configuration
     
     // Betting state
     @Published var playerBet: Int = 0
     @Published var betChips: [Int] = []
+    @Published var originalLargestChip: Int? = nil // Store the largest chip before consolidation for gameplay minimization
+    @Published var displayChip: Int? = nil // SINGLE chip to display during gameplay - set IMMEDIATELY when deal starts, never modified during gameplay
     @Published var additionalBetChips: [Int] = [] // Right-side stack for double down/split
     @Published var doubleDownChipsHand2: [Int] = [] // Double down chips for Hand 2 (left)
     @Published var doubleDownChipsHand1: [Int] = [] // Double down chips for Hand 1 (right)
@@ -38,6 +41,7 @@ class BlackjackGameState: ObservableObject {
     @Published var splitHandBets: [Int] = [] // Individual bet amounts for each split hand
     @Published var doubledDownHandIndex: Int? = nil // Track which split hand was doubled down (0 or 1)
     @Published var hideBetChipsDuringLoseAnimation: Bool = false // Hide bet chips during lose animation
+    @Published var maxBet: Int = 1_000 // Maximum bet per hand (default, set from map)
     
     // Chip selection positions (from GeometryReader) - kept for potential future use
     @Published var chipSelectionPositions: [Int: CGPoint] = [:] // Chip Value -> Position
@@ -82,6 +86,8 @@ class BlackjackGameState: ObservableObject {
     @Published var isCollectingPhase: Bool = false
     @Published var cardsJustCollected: Bool = false // Track when cards were just collected (for training mode button positioning)
     @Published var hasEverDealtCards: Bool = false // Track if cards have ever been dealt (for stable button positioning)
+    @Published var isTransitioningChips: Bool = false // Track when chips are transitioning from stacked to single
+    @Published var chipsMinimized: Bool = false // Track when chips have been minimized for gameplay (prevents showing intermediate states)
     
     // Position tracking for animations
     @Published var playerCardPositions: [Int: CGPoint] = [:]
@@ -97,17 +103,19 @@ class BlackjackGameState: ObservableObject {
     var cardsRemaining: Int { deck.count }
     
     var canSplit: Bool {
-        print("🃏 🔴 canSplit called: isSplit=\(isSplit), handCount=\(playerHand.count), bet=\(playerBet), chips=\(XPChipManager.shared.userChips)")
+        print("🃏 🔴 canSplit called: isSplit=\(isSplit), handCount=\(playerHand.count), bet=\(playerBet), maxBet=\(maxBet), chips=\(XPChipManager.shared.userChips)")
         
         let hasEnoughChips = playerBet <= XPChipManager.shared.userChips
+        let withinMaxBet = playerBet <= maxBet // Current bet must be <= max bet (after split it will be 2x max bet max)
         print("🃏 🔴 CHIP VALIDATION: need \(playerBet), have \(XPChipManager.shared.userChips), RESULT: \(hasEnoughChips ? "PASS" : "FAIL")")
+        print("🃏 🔴 MAX BET VALIDATION: bet \(playerBet), maxBet \(maxBet), RESULT: \(withinMaxBet ? "PASS" : "FAIL")")
         
         let notSplit = !isSplit
         let correctHandCount = playerHand.count == 2
         
-        print("🃏 🔴 ALL VALIDATIONS: notSplit=\(notSplit), correctHandCount=\(correctHandCount), hasEnoughChips=\(hasEnoughChips)")
+        print("🃏 🔴 ALL VALIDATIONS: notSplit=\(notSplit), correctHandCount=\(correctHandCount), hasEnoughChips=\(hasEnoughChips), withinMaxBet=\(withinMaxBet)")
         
-        guard notSplit && correctHandCount && hasEnoughChips else {
+        guard notSplit && correctHandCount && hasEnoughChips && withinMaxBet else {
             print("🃏 🔴 canSplit FAILED - returning false")
             return false
         }
@@ -142,13 +150,18 @@ class BlackjackGameState: ObservableObject {
             // For split hands, check if active hand has 2 cards and we have enough chips for that hand's bet
             let activeHandBet = splitHandBets.isEmpty ? (playerBet / 2) : splitHandBets[activeHandIndex]
             let activeHand = splitHands[activeHandIndex]
-            let result = activeHand.count == 2 && activeHandBet <= XPChipManager.shared.userChips
-            print("🎲 canDoubleDown (split): \(result) (handIndex: \(activeHandIndex), cards: \(activeHand.count), handBet: \(activeHandBet), availableChips: \(XPChipManager.shared.userChips))")
+            let hasEnoughChips = activeHandBet <= XPChipManager.shared.userChips
+            let withinMaxBet = activeHandBet <= maxBet // Each hand's bet must be <= max bet
+            let result = activeHand.count == 2 && hasEnoughChips && withinMaxBet
+            print("🎲 canDoubleDown (split): \(result) (handIndex: \(activeHandIndex), cards: \(activeHand.count), handBet: \(activeHandBet), maxBet: \(maxBet), availableChips: \(XPChipManager.shared.userChips))")
             return result
         } else {
             // For regular hands, check if we have enough chips for double down (need playerBet amount more)
-            let result = playerHand.count == 2 && playerBet <= XPChipManager.shared.userChips
-            print("🎲 canDoubleDown (regular): \(result) (cards: \(playerHand.count), bet: \(playerBet), availableChips: \(XPChipManager.shared.userChips))")
+            // And check that current bet <= max bet (after doubling it will be 2x max bet max)
+            let hasEnoughChips = playerBet <= XPChipManager.shared.userChips
+            let withinMaxBet = playerBet <= maxBet // Current bet must be <= max bet
+            let result = playerHand.count == 2 && hasEnoughChips && withinMaxBet
+            print("🎲 canDoubleDown (regular): \(result) (cards: \(playerHand.count), bet: \(playerBet), maxBet: \(maxBet), availableChips: \(XPChipManager.shared.userChips))")
             return result
         }
     }
@@ -189,6 +202,8 @@ class BlackjackGameState: ObservableObject {
         if !isCollectingPhase {
             playerBet = 0
             betChips = []
+            originalLargestChip = nil
+            displayChip = nil // Clear display chip
             additionalBetChips = [] // Clear additional bet chips
             doubleDownChipsHand2 = [] // Clear double down chips for Hand 2
             doubleDownChipsHand1 = [] // Clear double down chips for Hand 1
@@ -222,6 +237,8 @@ class BlackjackGameState: ObservableObject {
         isCollectingPhase = false
         cardsJustCollected = false
         hasEverDealtCards = false
+        isTransitioningChips = false
+        chipsMinimized = false
         playerCardPositions.removeAll()
         dealerCardPositions.removeAll()
         cardDealPositions.removeAll()
@@ -246,6 +263,7 @@ class BlackjackGameState: ObservableObject {
         showNextHand = false
         playerBet = 0
         betChips = []
+        displayChip = nil // Clear display chip
         splitHands = []
         activeHandIndex = 0
         isSplit = false
