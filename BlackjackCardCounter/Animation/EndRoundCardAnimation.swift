@@ -93,7 +93,7 @@ class EndRoundCardAnimation {
             let id = card.id
             
             // Calculate current position for each card
-            let currentX = CardPositioning.xForStaticCard(idx: index, count: cards.count, size: CGSize(width: 400, height: 800), isDealing: false)
+            let currentX = CardPositioning.xForStaticCard(idx: index, count: cards.count, size: CGSize(width: 400, height: 800), isDealing: false, isPlayer: isPlayer)
             let currentY = CardPositioning.yForHand(isPlayer: isPlayer, size: CGSize(width: 400, height: 800))
             let currentPos = CGPoint(x: currentX, y: currentY)
             
@@ -241,7 +241,7 @@ class EndRoundCardAnimation {
             if let pIndex = dealtPlayerCards.firstIndex(of: card) {
                 // Player card - calculate current position
                 let startPos = CGPoint(
-                    x: CardPositioning.xForStaticCard(idx: pIndex, count: dealtPlayerCards.count, size: CGSize(width: 400, height: 800), isDealing: false),
+                    x: CardPositioning.xForStaticCard(idx: pIndex, count: dealtPlayerCards.count, size: CGSize(width: 400, height: 800), isDealing: false, isPlayer: true),
                     y: CardPositioning.yForHand(isPlayer: true, size: CGSize(width: 400, height: 800))
                 )
                 gameState.animatingCardPositions[id] = startPos
@@ -255,7 +255,7 @@ class EndRoundCardAnimation {
             } else if let dIndex = dealtDealerCards.firstIndex(of: card) {
                 // Dealer card - calculate current position (same as player cards)
                 let startPos = CGPoint(
-                    x: CardPositioning.xForStaticCard(idx: dIndex, count: dealtDealerCards.count, size: CGSize(width: 400, height: 800), isDealing: false),
+                    x: CardPositioning.xForStaticCard(idx: dIndex, count: dealtDealerCards.count, size: CGSize(width: 400, height: 800), isDealing: false, isPlayer: false),
                     y: CardPositioning.yForHand(isPlayer: false, size: CGSize(width: 400, height: 800))
                 )
                 gameState.animatingCardPositions[id] = startPos

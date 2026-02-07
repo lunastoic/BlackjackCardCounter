@@ -7,6 +7,7 @@ struct TrainingModeFlipCardView: View {
     let isFlipped: Bool
     let width: CGFloat
     let glowWidth: CGFloat
+    let useTrainingCards: Bool
     @AppStorage("cardUnderglow") private var cardUnderglow: Bool = true
     
     // Flip control (matching regular mode)
@@ -83,31 +84,9 @@ struct TrainingModeFlipCardView: View {
         }
     }
     
-    // Calculate the card image name based on card value (uses T_ prefixed assets for training mode)
+    // Calculate the card image name with fallback to non-training asset if missing
     private var cardImageName: String {
-        // Always use the face-up version of the card for training mode
-        let rankString: String
-        switch card.rank {
-        case .ace: rankString = "Ace"
-        case .jack: rankString = "Jack"
-        case .queen: rankString = "Queen"
-        case .king: rankString = "King"
-        default: rankString = "\(card.rank.rawValue)"
-        }
-        
-        let suitString: String
-        switch card.suit {
-        case .spades: suitString = "Spades"
-        case .hearts: suitString = "Hearts"
-        case .diamonds: suitString = "Diamonds"
-        case .clubs: suitString = "Clubs"
-        @unknown default: suitString = "Clubs"
-        }
-        
-        // Always use T_ prefix for training mode
-        let baseName = "\(rankString)Of\(suitString)"
-        let imageName = "T_\(baseName)"
-        return imageName
+        card.faceImageName(isTrainingMode: true, useTrainingCardsFolder: useTrainingCards)
     }
 
     private var faceView: some View {
@@ -116,6 +95,7 @@ struct TrainingModeFlipCardView: View {
                 Image(cardImageName)
                     .resizable()
                     .aspectRatio(0.7, contentMode: .fit)
+                    .id("\(cardImageName)_\(useTrainingCards)") // Force view update when image name or setting changes
             } else {
                 // Fallback: render rank/suit so we never show a blank outline card
                 RoundedRectangle(cornerRadius: 8)
@@ -134,6 +114,7 @@ struct TrainingModeFlipCardView: View {
         }
         .frame(width: width, height: 90)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .id(useTrainingCards) // Explicit dependency on setting to force view update
     }
     
     // Training mode glow color logic
@@ -156,6 +137,7 @@ struct TrainingModeCardView: View {
     let width: CGFloat
     let height: CGFloat
     let glowWidth: CGFloat
+    let useTrainingCards: Bool
     @AppStorage("cardUnderglow") private var cardUnderglow: Bool = true
     
     @State private var appeared = false
@@ -174,14 +156,14 @@ struct TrainingModeCardView: View {
                             .foregroundColor(.white)
                     )
             } else {
-                Image(card.imageName(isTrainingMode: true))
+                Image(card.imageName(isTrainingMode: true, useTrainingCardsFolder: useTrainingCards))
                     .resizable()
                     .aspectRatio(0.7, contentMode: .fit)
                     .frame(width: width, height: height)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .onAppear {
                         // Check if image exists
-                        if UIImage(named: card.imageName(isTrainingMode: true)) == nil {
+                        if UIImage(named: card.imageName(isTrainingMode: true, useTrainingCardsFolder: useTrainingCards)) == nil {
                             imageLoadFailed = true
                         }
                     }

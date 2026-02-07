@@ -9,6 +9,7 @@ struct BlackjackActionButtons: View {
     
     var body: some View {
         let _ = print("🃏 BlackjackActionButtons rendered: playerHand.count=\(gameState.playerHand.count), canSplit=\(gameState.canSplit)")
+        let playerTurnActive = gameState.isPlayerTurn && !gameState.isProcessingAction
         
         HStack(spacing: 18) {
             PremiumActionButton(
@@ -17,8 +18,8 @@ struct BlackjackActionButtons: View {
                 color1: "ff8800",
                 color2: "ffb300",
                 isEnabled: {
-                    let canDoubleDown = gameState.canDoubleDown && !gameState.isProcessingAction
-                    print("🎲 Double Down button check: canDoubleDown=\(gameState.canDoubleDown), processing=\(gameState.isProcessingAction), final=\(canDoubleDown)")
+                    let canDoubleDown = gameState.canDoubleDown && playerTurnActive
+                    print("🎲 Double Down button check: canDoubleDown=\(gameState.canDoubleDown), playerTurnActive=\(playerTurnActive), final=\(canDoubleDown)")
                     return canDoubleDown
                 }(),
                 action: {
@@ -33,7 +34,7 @@ struct BlackjackActionButtons: View {
                 systemImage: "hand.point.up.left.fill",
                 color1: "02a10f",
                 color2: "02a10f",
-                isEnabled: !gameState.isProcessingAction && Date().timeIntervalSince(gameState.lastActionTime) >= 0.6,
+                isEnabled: playerTurnActive && Date().timeIntervalSince(gameState.lastActionTime) >= 0.6,
                 action: { 
                     print("🎯 Hit button tapped")
                     gameEngine.hitAction(gameState: gameState) 
@@ -46,7 +47,7 @@ struct BlackjackActionButtons: View {
                 systemImage: "hand.raised.fill",
                 color1: "b80802",
                 color2: "b80802",
-                isEnabled: !gameState.isProcessingAction,
+                isEnabled: playerTurnActive,
                 action: { gameEngine.standAction(gameState: gameState) },
                 highlighted: showStrategyHints && getPerfectStrategyAction() == "Stand"
             )
@@ -57,8 +58,8 @@ struct BlackjackActionButtons: View {
                 color1: "2193b0",
                 color2: "6dd5ed",
                 isEnabled: {
-                    let canSplit = gameState.canSplit && !gameState.isProcessingAction
-                    print("🃏 Split button check: canSplit=\(gameState.canSplit), processing=\(gameState.isProcessingAction), final=\(canSplit)")
+                    let canSplit = gameState.canSplit && playerTurnActive
+                    print("🃏 Split button check: canSplit=\(gameState.canSplit), playerTurnActive=\(playerTurnActive), final=\(canSplit)")
                     return canSplit
                 }(),
                 action: {
@@ -71,6 +72,8 @@ struct BlackjackActionButtons: View {
         .frame(maxWidth: 440)
         .padding(.top, 12)
         .disableDynamicType()
+        .allowsHitTesting(playerTurnActive)
+        .opacity(playerTurnActive ? 1.0 : 0.0)
     }
 }
 

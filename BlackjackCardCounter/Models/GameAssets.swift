@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum CardSuit: String, CaseIterable {
     case spades = "♠️"
@@ -94,16 +95,19 @@ struct Card: Identifiable, Equatable {
         return "\(rankString)Of\(suitString)"
     }
     
-    func imageName(isTrainingMode: Bool) -> String {
+    func imageName(isTrainingMode: Bool, useTrainingCardsFolder: Bool = false) -> String {
         if !isFaceUp {
             return "DeckCover"
         }
-        return faceImageName(isTrainingMode: isTrainingMode)
+        return faceImageName(isTrainingMode: isTrainingMode, useTrainingCardsFolder: useTrainingCardsFolder)
     }
     
     /// Returns the face image name regardless of `isFaceUp`.
     /// Used for flip animations where `isFlipped` controls visibility.
-    func faceImageName(isTrainingMode: Bool) -> String {
+    /// - Parameters:
+    ///   - isTrainingMode: Whether we're in training mode (affects fallback behavior)
+    ///   - useTrainingCardsFolder: Whether to use TrainingCards folder assets (user setting)
+    func faceImageName(isTrainingMode: Bool, useTrainingCardsFolder: Bool = false) -> String {
         let rankString: String
         switch rank {
         case .ace: rankString = "Ace"
@@ -122,7 +126,24 @@ struct Card: Identifiable, Equatable {
         }
         
         let baseName = "\(rankString)Of\(suitString)"
-        return isTrainingMode ? "T_\(baseName)" : baseName
+        
+        // If useTrainingCardsFolder is enabled, use TrainingCards folder assets
+        if useTrainingCardsFolder {
+            let trainingCardsName = "TrainingCards_\(baseName)"
+            if UIImage(named: trainingCardsName) != nil {
+                return trainingCardsName
+            }
+            // Fallback to legacy T_ prefix if present
+            let legacyTrainingName = "T_\(baseName)"
+            if UIImage(named: legacyTrainingName) != nil {
+                return legacyTrainingName
+            }
+            // Last resort: regular asset
+            return baseName
+        }
+        
+        // When useTrainingCardsFolder is disabled (default), always use regular Cards folder (base name)
+        return baseName
     }
     
     var countValue: Int {

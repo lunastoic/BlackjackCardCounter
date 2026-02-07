@@ -472,8 +472,13 @@ struct RegularModeView: View {
                     
                     if gameState.isPlayerTurn && gameState.playerHand.count >= 2 {
                             // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                            let activeHasBlackjack = gameState.isSplit && 
-                                gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                            let activeHasBlackjack: Bool = {
+                                if gameState.isSplit {
+                                    return gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                                } else {
+                                    return gameEngine.isBlackjack(gameState.playerHand)
+                                }
+                            }()
                             
                             let playerBusted = gameState.isSplit ? 
                                 gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
@@ -550,7 +555,7 @@ struct RegularModeView: View {
                 guard let gameState = gameState else { return }
                 
                 let currentCount = isPlayerCard ? gameState.dealtPlayerCards.count : gameState.dealtDealerCards.count
-                let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize)
+                let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize, isPlayer: isPlayerCard)
                 let y = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
                 let destination = CGPoint(x: x, y: y)
                 
@@ -936,7 +941,12 @@ struct RegularModeView: View {
             gameState: gameState
         ) {
             // Clean up after collection
-            discardPile.append(contentsOf: sequence)
+            let skipDiscard = UserDefaults.standard.bool(forKey: "debugEightCardUser")
+            if !skipDiscard {
+                discardPile.append(contentsOf: sequence)
+            } else {
+                print("🎲 Debug: 8 cards for player and dealer enabled - discard pile disabled")
+            }
             gameState.dealtPlayerCards = []
             gameState.dealtDealerCards = []
             finalPlayerPositions.removeAll()

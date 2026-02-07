@@ -18,6 +18,7 @@ struct BlackjackCardCounterApp: App {
         // DISABLE DEBUG SETTINGS BY DEFAULT to ensure proper randomization
         UserDefaults.standard.set(false, forKey: "debugForcePairs")
         UserDefaults.standard.set(false, forKey: "debugForce10s")
+        UserDefaults.standard.set(false, forKey: "debugEightCardUser")
         print("🎲 App initialized: Debug settings disabled for proper randomization")
     }
     

@@ -22,6 +22,53 @@ class BlackjackGameEngine: ObservableObject {
     var splitAnimationCallback: ((Card, Int, @escaping () -> Void) -> Void)?
     
     private init() {}
+
+    // MARK: - Debug helpers
+    private enum CardRecipient {
+        case player
+        case dealer
+    }
+    
+    private var debugEightCardQueue: [CardRank] = []
+    private var debugEightCardSuitIndex: Int = 0
+    
+    private func isEightCardDebugEnabled() -> Bool {
+        UserDefaults.standard.bool(forKey: "debugEightCardUser")
+    }
+    
+    private func nextEightCardRank() -> CardRank {
+        if debugEightCardQueue.isEmpty {
+            // Fixed 8-card debug pattern: 2,2,2,2,3,A,2,6
+            debugEightCardQueue = [.two, .two, .two, .two, .three, .ace, .two, .six]
+        }
+        return debugEightCardQueue.removeFirst()
+    }
+    
+    private func nextEightCardSuit() -> CardSuit {
+        let suits = CardSuit.allCases
+        let suit = suits[debugEightCardSuitIndex % suits.count]
+        debugEightCardSuitIndex = (debugEightCardSuitIndex + 1) % suits.count
+        return suit
+    }
+    
+    /// When "8 cards for player and dealer" debug mode is enabled, always return a generated
+    /// low-value card (four 2s then four 3s, repeating) for both player and dealer.
+    /// Cards are synthesized so we can reuse values without depleting the deck or
+    /// falling back to higher ranks.
+    private func drawCard(for recipient: CardRecipient, deck: inout [Card]) -> Card {
+        if isEightCardDebugEnabled() {
+            let targetRank = nextEightCardRank()
+            let generatedCard = Card(suit: nextEightCardSuit(), rank: targetRank, isFaceUp: true)
+            return generatedCard
+        }
+        
+        guard !deck.isEmpty else {
+            // Fallback for unexpected empty deck states during debug testing
+            return Card(suit: .spades, rank: .two, isFaceUp: true)
+        }
+        
+        return deck.removeFirst()
+    }
     
     // MARK: - Hand Value Calculations
     func handValue(_ hand: [Card]) -> Int {
@@ -136,7 +183,8 @@ class BlackjackGameEngine: ObservableObject {
         let now = Date()
         let timeSinceLastAction = now.timeIntervalSince(gameState.lastActionTime)
         
-        guard gameState.deck.count > 0, 
+        let hasDrawableCard = gameState.deck.count > 0 || isEightCardDebugEnabled()
+        guard hasDrawableCard,
               !gameState.isProcessingAction,
               timeSinceLastAction >= 0.6 else { 
             print("🎯 hitAction: BLOCKED - processing=\(gameState.isProcessingAction), timeSince=\(timeSinceLastAction)")
@@ -148,7 +196,9 @@ class BlackjackGameEngine: ObservableObject {
         print("🎯 hitAction: Processing locked at \(now)")
 
         if gameState.isSplit {
-            let newCard = gameState.deck.removeFirst()
+            var deck = gameState.deck
+            let newCard = drawCard(for: .player, deck: &deck)
+            gameState.deck = deck
             gameState.runningCount += newCard.countValue
             gameState.cardsDealt += 1
             
@@ -194,7 +244,9 @@ class BlackjackGameEngine: ObservableObject {
                 }
             }
                 } else {
-            let newCard = gameState.deck.removeFirst()
+            var deck = gameState.deck
+            let newCard = drawCard(for: .player, deck: &deck)
+            gameState.deck = deck
             gameState.runningCount += newCard.countValue
             gameState.cardsDealt += 1
             
@@ -294,7 +346,9 @@ class BlackjackGameEngine: ObservableObject {
             return
         }
         
-        if gameState.deck.count > 0,
+        let hasDrawableCard = gameState.deck.count > 0 || isEightCardDebugEnabled()
+        
+        if hasDrawableCard,
            gameState.playerHand.count == 2,
            gameState.playerBet <= XPChipManager.shared.userChips {
             
@@ -318,7 +372,9 @@ class BlackjackGameEngine: ObservableObject {
                 gameState.deckPosition = CGPoint(x: UIScreen.main.bounds.width * 0.85, y: UIScreen.main.bounds.height * 0.15)
             }
             
-            let newCard = gameState.deck.removeFirst()
+            var deck = gameState.deck
+            let newCard = drawCard(for: .player, deck: &deck)
+            gameState.deck = deck
             gameState.playerHand.append(newCard)
             gameState.runningCount += newCard.countValue
             
@@ -384,7 +440,9 @@ class BlackjackGameEngine: ObservableObject {
             print("🎲 Double Down Split: Active hand cards count=\(gameState.splitHands[gameState.activeHandIndex].count)")
         }
         
-        guard gameState.deck.count > 0,
+        let hasDrawableCard = gameState.deck.count > 0 || isEightCardDebugEnabled()
+        
+        guard hasDrawableCard,
               gameState.activeHandIndex < gameState.splitHands.count,
               gameState.splitHands[gameState.activeHandIndex].count == 2 else {
             print("🎲 Double Down Split: Invalid conditions - deck.count=\(gameState.deck.count), activeHandIndex=\(gameState.activeHandIndex), splitHands.count=\(gameState.splitHands.count)")
@@ -463,7 +521,9 @@ class BlackjackGameEngine: ObservableObject {
         }
         
         // Deal one card to the active hand
-        let newCard = gameState.deck.removeFirst()
+        var deck = gameState.deck
+        let newCard = drawCard(for: .player, deck: &deck)
+        gameState.deck = deck
         gameState.runningCount += newCard.countValue
         gameState.cardsDealt += 1
         
@@ -593,13 +653,18 @@ class BlackjackGameEngine: ObservableObject {
         func dealNext() {
             guard step < order.count else { return }
             let handIndex = order[step]
-            guard handIndex < gameState.splitHands.count, !gameState.deck.isEmpty else { return }
+            let hasDrawableCard = !gameState.deck.isEmpty || isEightCardDebugEnabled()
+            guard handIndex < gameState.splitHands.count, hasDrawableCard else { return }
 
             // Debug: Force specific cards for split hands when debugForcePairs is enabled
             let forcePairs = UserDefaults.standard.bool(forKey: "debugForcePairs")
+            let eightCardDebug = isEightCardDebugEnabled()
             var card: Card
             
-            if forcePairs && handIndex == 0 {
+            if eightCardDebug {
+                card = drawCard(for: .player, deck: &gameState.deck)
+                print("🎲 Debug: 8 cards for player and dealer enabled - dealt \(card.rank.rawValue) to split hand \(handIndex)")
+            } else if forcePairs && handIndex == 0 {
                 // Hand 2 (left hand, index 0) - force an Ace for easy 21 testing
                 if let aceIndex = gameState.deck.firstIndex(where: { $0.rank == .ace }) {
                     card = gameState.deck.remove(at: aceIndex)
@@ -702,12 +767,17 @@ class BlackjackGameEngine: ObservableObject {
         var localRunningCount = gameState.runningCount
         var newDealtDealerCards = gameState.dealtDealerCards
         
+        let forceEight = isEightCardDebugEnabled()
+        
         func dealNextCard() {
-            if self.handValue(dealer) < 17, !localDeck.isEmpty {
+            if self.handValue(dealer) < 17, (!localDeck.isEmpty || forceEight) {
                 var card: Card
                 let forcePairs = UserDefaults.standard.bool(forKey: "debugForcePairs")
                 
-                if forcePairs {
+                if forceEight {
+                    card = drawCard(for: .dealer, deck: &localDeck)
+                    print("🎲 Debug: 8 cards for player and dealer enabled - dealer draws \(card.rank.rawValue)")
+                } else if forcePairs {
                     // When force pairs is enabled, make dealer always bust
                     let currentValue = self.handValue(dealer)
                     print("🎲 Debug: Force Pairs enabled - Dealer current value: \(currentValue)")
@@ -788,6 +858,8 @@ class BlackjackGameEngine: ObservableObject {
     
     func endPlayerTurn(gameState: BlackjackGameState, playerBusted: Bool) {
         gameState.isPlayerTurn = false
+        gameState.isProcessingAction = false
+        gameState.isProcessingAction = false
         var msg = ""
         var payout = 0
         
@@ -843,18 +915,34 @@ class BlackjackGameEngine: ObservableObject {
         } else {
             let playerVal = handValue(gameState.playerHand)
             let dealerVal = handValue(gameState.dealerHand)
-            let blackjack = gameState.playerHand.count == 2 &&
-                ((gameState.playerHand[0].rank == .ace && gameState.playerHand[1].rank.value == 10) || 
-                 (gameState.playerHand[1].rank == .ace && gameState.playerHand[0].rank.value == 10))
+            let playerBlackjack = gameState.playerHand.count == 2 && playerVal == 21
+            let dealerBlackjack = gameState.dealerHand.count == 2 && dealerVal == 21
             
-            if playerBusted { payout = -gameState.playerBet }
-            else if blackjack {
-                let win = Int(Double(gameState.playerBet) * 1.5)
-                msg = "Blackjack!"
-                payout = gameState.playerBet + win
-            } else if dealerVal > 21 || playerVal > dealerVal { payout = gameState.playerBet * 2 }
-            else if playerVal == dealerVal { payout = 0 }
-            else { payout = -gameState.playerBet }
+            print("🃏 endPlayerTurn: playerVal=\(playerVal), dealerVal=\(dealerVal), playerBlackjack=\(playerBlackjack), dealerBlackjack=\(dealerBlackjack), playerHand.count=\(gameState.playerHand.count)")
+            
+            if playerBusted {
+                payout = -gameState.playerBet
+            } else if playerBlackjack {
+                if dealerBlackjack {
+                    payout = gameState.playerBet // push
+                    msg = "Push"
+                    print("🃏 endPlayerTurn: Push - both have blackjack")
+                } else {
+                    let win = Int(Double(gameState.playerBet) * 1.5)
+                    payout = gameState.playerBet + win
+                    msg = "Blackjack! Won $\(win)"
+                    print("🃏 endPlayerTurn: Player blackjack wins! win=\(win), payout=\(payout)")
+                }
+            } else if dealerBlackjack {
+                payout = -gameState.playerBet
+                msg = "Dealer Blackjack"
+            } else if dealerVal > 21 || playerVal > dealerVal {
+                payout = gameState.playerBet * 2
+            } else if playerVal == dealerVal {
+                payout = 0
+            } else {
+                payout = -gameState.playerBet
+            }
         }
         
         gameState.lastPayout = payout
@@ -937,12 +1025,11 @@ class BlackjackGameEngine: ObservableObject {
             
             XPChipManager.shared.updateChips(credited)
             let after = XPChipManager.shared.userChips
-            let actualChange = after - before
+            _ = after - before // actualChange not used; keep for future debugging
 
             print("💰 Game result: payout=\(payout), playerBet=\(gameState.playerBet), credited=\(credited)")
-            gameState.debugPayoutMessage = "Expected: +$\(credited), Actual: +$\(actualChange)"
-            gameState.showDebugPayout = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { gameState.showDebugPayout = false }
+            gameState.debugPayoutMessage = "" // suppress debug overlay
+            gameState.showDebugPayout = false
             
             // Award XP based on outcome: Win = 3 XP, Push = 2 XP, Loss = 1 XP
             if payout > 0 {
@@ -1013,6 +1100,8 @@ class BlackjackGameEngine: ObservableObject {
         } else {
             print("🎯 EndRound: Skipping resetGame during card collection animation")
         }
+        debugEightCardQueue.removeAll()
+        debugEightCardSuitIndex = 0
         gameState.deck = Array(repeating: CardDeck.standardDeck(), count: numberOfDecks).flatMap { $0 }.shuffled()
         gameState.originalDeck = gameState.deck // Store original deck for shuffling
         gameState.needsShuffling = false
@@ -1025,6 +1114,10 @@ class BlackjackGameEngine: ObservableObject {
         useRegularModeAnimation: Bool = false,
         animationCallback: ((Card, Int, @escaping () -> Void) -> Void)? = nil
     ) {
+        if isEightCardDebugEnabled() {
+            debugEightCardQueue.removeAll()
+            debugEightCardSuitIndex = 0
+        }
         // Check if shuffling is needed before dealing
         checkForShuffling(gameState: gameState)
         
@@ -1069,32 +1162,12 @@ class BlackjackGameEngine: ObservableObject {
         var localDeck = gameState.deck
         var localRunning = gameState.runningCount
         var i = 0
+        let forceEight = isEightCardDebugEnabled()
         
         func dealNext() {
             guard i < 4 else {
                 gameState.isDealing = false
-                if gameState.playerHand.count == 2 && 
-                   ((gameState.playerHand[0].rank == .ace && gameState.playerHand[1].rank.value == 10) || 
-                    (gameState.playerHand[1].rank == .ace && gameState.playerHand[0].rank.value == 10)) {
-                    
-                    let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-                    print("🎓 Player has blackjack! trainingModeEnabled=\(trainingModeEnabled)")
-                    
-                    if trainingModeEnabled {
-                        // In training mode, reveal dealer card first so we can see what they had
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.revealDealerCard(gameState: gameState) {
-                                // After revealing dealer card, end the hand
-                                self.endPlayerTurn(gameState: gameState, playerBusted: false)
-                            }
-                        }
-                    } else {
-                        // In regular mode, immediately end the hand (original behavior)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.endPlayerTurn(gameState: gameState, playerBusted: false)
-                        }
-                    }
-                }
+                // Blackjack check now happens after dealer's second card is added (in case 3)
                 return
             }
             
@@ -1102,7 +1175,11 @@ class BlackjackGameEngine: ObservableObject {
             let forcePairs = UserDefaults.standard.bool(forKey: "debugForcePairs")
             let force10s = UserDefaults.standard.bool(forKey: "debugForce10s")
             
-            if forcePairs && (i == 0 || i == 2) {
+            if forceEight {
+                let recipient: CardRecipient = (i == 1 || i == 3) ? .dealer : .player
+                card = drawCard(for: recipient, deck: &localDeck)
+                print("🎲 Debug: 8 cards for player and dealer enabled - dealt \(card.rank.rawValue) to \(recipient == .player ? "player" : "dealer") at index \(i)")
+            } else if forcePairs && (i == 0 || i == 2) {
                 // Force pairs logic (existing)
                 if i == 0 {
                     card = localDeck.removeFirst()
@@ -1182,20 +1259,15 @@ class BlackjackGameEngine: ObservableObject {
                 else { withAnimation(.easeOut(duration: 0.3)) { gameState.dealtDealerCards.append(down) } }
 
             case 2:
+                // Add card to playerHand immediately for blackjack detection
+                gameState.playerHand.append(card)
+                
                 if useRegularModeAnimation, let cb = animationCallback { 
                     cb(card, i) { 
                         gameState.dealtPlayerCards.append(card)
-                        // Delay adding to playerHand to match hit timing (0.1 seconds after flip)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            gameState.playerHand.append(card)
-                        }
                     } 
                 } else { 
                     withAnimation(.easeOut(duration: 0.3)) { gameState.dealtPlayerCards.append(card) }
-                    // Delay adding to playerHand to match hit timing (0.1 seconds after flip)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        gameState.playerHand.append(card)
-                    }
                 }
 
             case 3:
@@ -1214,10 +1286,22 @@ class BlackjackGameEngine: ObservableObject {
                     cb(card, i) {
                         gameState.dealtDealerCards.append(card)
                         gameState.visuallyRevealedDealerHand.append(card)
+                        
+                        // After dealer's second card is added, check for player natural blackjack
+                        // Use gameState values since they're updated after each card
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.checkForNaturalBlackjack(gameState: gameState)
+                        }
                     }
                 } else {
                     withAnimation(.easeOut(duration: 0.3)) { gameState.dealtDealerCards.append(card) }
                     gameState.visuallyRevealedDealerHand.append(card)
+                    
+                    // After dealer's second card is added, check for player natural blackjack
+                    // Use gameState values since they're updated after each card
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.checkForNaturalBlackjack(gameState: gameState)
+                    }
                 }
             default: break
             }
@@ -1231,10 +1315,61 @@ class BlackjackGameEngine: ObservableObject {
             
             i += 1
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dealNext() }
+            // Only continue dealing if we haven't detected a blackjack
+            if i < 4 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dealNext() }
+            }
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { dealNext() }
+    }
+
+    /// Check for natural blackjack after all initial cards are dealt
+    private func checkForNaturalBlackjack(gameState: BlackjackGameState) {
+        // Ensure we have exactly 2 player cards
+        guard gameState.playerHand.count == 2 else {
+            print("🃏 Blackjack check: Player hand has \(gameState.playerHand.count) cards, skipping check")
+            return
+        }
+        
+        // Detect natural blackjack (any Ace + any 10-value) for 2-card player hand
+        let playerVal = handValue(gameState.playerHand)
+        let playerNaturalBlackjack = playerVal == 21
+        
+        print("🃏 Blackjack check: Player hand value = \(playerVal), cards = \(gameState.playerHand.map { "\($0.rank.rawValue)" })")
+        
+        if playerNaturalBlackjack {
+            print("🃏 Natural blackjack detected! Resolving...")
+            // Ensure cardsDealt is correct
+            if gameState.cardsDealt < 4 {
+                gameState.cardsDealt = 4
+            }
+            gameState.isDealing = false
+            resolvePlayerNaturalBlackjack(gameState: gameState)
+        }
+    }
+    
+    /// Resolve a player natural blackjack (first two cards = 21) for both modes.
+    /// Immediately ends player turn, hides buttons, reveals dealer hole for push check, then finishes.
+    private func resolvePlayerNaturalBlackjack(gameState: BlackjackGameState) {
+        print("🃏 resolvePlayerNaturalBlackjack called")
+        
+        // Track natural blackjack for achievements/stats
+        Task { await AchievementsStore.shared.incrementStat(.blackjacks, by: 1) }
+        
+        // Hide player actions immediately (sync on main thread)
+        DispatchQueue.main.async {
+            print("🃏 Hiding player actions - setting isPlayerTurn=false, isProcessingAction=true")
+            gameState.isPlayerTurn = false
+            gameState.isProcessingAction = true
+            
+            // Reveal dealer hole card and then end hand (handles push vs win)
+            self.revealDealerCard(gameState: gameState) {
+                print("🃏 Dealer card revealed, calling endPlayerTurn")
+                self.endPlayerTurn(gameState: gameState, playerBusted: false)
+                print("🃏 endPlayerTurn completed, resultMessage=\(gameState.resultMessage ?? "nil")")
+            }
+        }
     }
     
     func dealNewHand(gameState: BlackjackGameState) { gameState.resetForNewHand() }
@@ -1275,15 +1410,24 @@ class BlackjackGameEngine: ObservableObject {
     
     // MARK: - Dealer hole reveal
     func revealDealerCard(gameState: BlackjackGameState, completion: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            _ = withAnimation(.easeInOut(duration: 0.6)) { gameState.flippedDealerCards.insert(0) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                // Update counting state after flip animation completes
-                gameState.countingRevealedDealerCards.insert(0)
-                if gameState.dealerHand.count > 0 {
-                    gameState.visuallyRevealedDealerHand.append(gameState.dealerHand[0])
+        DispatchQueue.main.async {
+            // Wait 0.5 seconds before starting flip animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Start flip animation
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    gameState.flippedDealerCards.insert(0)
                 }
-                completion()
+                // Update counting state and visually revealed hand after animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    gameState.countingRevealedDealerCards.insert(0)
+                    if gameState.dealerHand.count > 0 {
+                        // Only add if not already in visuallyRevealedDealerHand
+                        if !gameState.visuallyRevealedDealerHand.contains(where: { $0.id == gameState.dealerHand[0].id }) {
+                            gameState.visuallyRevealedDealerHand.append(gameState.dealerHand[0])
+                        }
+                    }
+                    completion()
+                }
             }
         }
     }

@@ -88,7 +88,8 @@ struct AnimatedCardsOverlay: View {
                         idx: idx, 
                         count: dealtDealerCards.count, 
                         size: tableSize,
-                        isDealing: false // This should be passed as parameter if needed
+                            isDealing: false, // This should be passed as parameter if needed
+                            isPlayer: false
                     )
                     let computedY = CardPositioning.yForHand(isPlayer: false, size: tableSize)
                     let pos = finalDealerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)
@@ -117,7 +118,8 @@ struct AnimatedCardsOverlay: View {
                             idx: idx, 
                             count: dealtPlayerCards.count, 
                             size: tableSize,
-                            isDealing: false // This should be passed as parameter if needed
+                            isDealing: false, // This should be passed as parameter if needed
+                            isPlayer: true
                         )
                         let computedY = CardPositioning.yForHand(isPlayer: true, size: tableSize)
                         let pos = finalPlayerPositions[card.id] ?? CGPoint(x: computedX, y: computedY)

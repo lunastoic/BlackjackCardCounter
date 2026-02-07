@@ -31,6 +31,7 @@ struct TrainingModeAnimatedCardsOverlay: View {
     // Training-specific offsets
     let playerCardYOffset: CGFloat
     let dealerCardYOffset: CGFloat
+    let useTrainingCards: Bool
     
     var body: some View {
         ZStack {
@@ -41,14 +42,16 @@ struct TrainingModeAnimatedCardsOverlay: View {
                     
                     // Only show animated cards for non-split hands (split cards are in separate overlay)
                     if !isSplit {
+                        let imageName = card.imageName(isTrainingMode: true, useTrainingCardsFolder: useTrainingCards)
                         let core = ZStack {
-                            Image(card.imageName(isTrainingMode: true))
+                            Image(imageName)
                                 .resizable()
                                 .aspectRatio(0.7, contentMode: .fit)
                                 .frame(width: CardMetrics.cardSize.width, height: CardMetrics.cardSize.height)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .shadow(radius: 3)
                                 .opacity((cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
+                                .id("\(imageName)_\(useTrainingCards)") // Force view update when image name or setting changes
                                 .rotation3DEffect(
                                     .degrees((cardFlipRotations[cardId] ?? 0) - 180),
                                     axis: (x: 0, y: 1, z: 0), perspective: 0.6
@@ -91,7 +94,8 @@ struct TrainingModeAnimatedCardsOverlay: View {
                         idx: idx, 
                         count: dealtDealerCards.count, 
                         size: tableSize,
-                        isDealing: false // This should be passed as parameter if needed
+                        isDealing: false, // This should be passed as parameter if needed
+                        isPlayer: false
                     )
                     let computedY = CardPositioning.yForHand(isPlayer: false, size: tableSize)
                     let pos = finalDealerPositions[card.id] ?? CGPoint(x: computedX, y: computedY + dealerCardYOffset)
@@ -100,8 +104,10 @@ struct TrainingModeAnimatedCardsOverlay: View {
                         card: card,
                         isFlipped: flippedDealerCards.contains(idx),
                         width: CardMetrics.cardSize.width,
-                        glowWidth: 8
+                        glowWidth: 8,
+                        useTrainingCards: useTrainingCards
                     )
+                    .id("\(card.id)_\(useTrainingCards)") // Force update when setting changes
                     .onAppear {
                         print("🎯 TrainingModeAnimatedCardsOverlay: Dealer card \(idx) - \(card.rank.rawValue) of \(card.suit.rawValue), isFlipped: \(flippedDealerCards.contains(idx)), isFaceUp: \(card.isFaceUp)")
                     }
@@ -123,12 +129,14 @@ struct TrainingModeAnimatedCardsOverlay: View {
                             idx: idx, 
                             count: dealtPlayerCards.count, 
                             size: tableSize,
-                            isDealing: false // This should be passed as parameter if needed
+                            isDealing: false, // This should be passed as parameter if needed
+                            isPlayer: true
                         )
                         let computedY = CardPositioning.yForHand(isPlayer: true, size: tableSize)
                         let pos = finalPlayerPositions[card.id] ?? CGPoint(x: computedX, y: computedY + playerCardYOffset)
 
-                        TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8)
+                        TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8, useTrainingCards: useTrainingCards)
+                            .id("\(card.id)_\(useTrainingCards)") // Force update when setting changes
                             .matchedGeometryEffect(id: card.id, in: mgCards)
                             .position(pos)
                             .opacity(collectingCardIds.contains(card.id) ? 0 : 1)

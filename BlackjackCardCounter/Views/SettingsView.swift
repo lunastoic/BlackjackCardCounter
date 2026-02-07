@@ -253,6 +253,24 @@ struct SettingsView: View {
                                 .labelsHidden()
                             }
                             
+                            // 8 Card for User (lowest ranks first)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("8 cards for player and dealer")
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                    Text("Player and dealer draw fixed low sequence; reuse cards, skip discard pile")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                                Toggle("", isOn: .init(
+                                    get: { UserDefaults.standard.bool(forKey: "debugEightCardUser") },
+                                    set: { UserDefaults.standard.set($0, forKey: "debugEightCardUser") }
+                                ))
+                                .labelsHidden()
+                            }
+                            
                             // Force Blackjacks Toggle for Testing
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {

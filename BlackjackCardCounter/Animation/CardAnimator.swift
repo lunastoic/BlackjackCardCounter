@@ -146,7 +146,7 @@ class CardAnimator {
             if let pIndex = dealtPlayerCards.firstIndex(of: card) {
                 let startPos = finalPlayerPositions[id]
                     ?? CGPoint(
-                        x: CardPositioning.xForStaticCard(idx: pIndex, count: dealtPlayerCards.count, size: tableSize, isDealing: false),
+                        x: CardPositioning.xForStaticCard(idx: pIndex, count: dealtPlayerCards.count, size: tableSize, isDealing: false, isPlayer: true),
                         y: CardPositioning.yForHand(isPlayer: true, size: tableSize)
                     )
                 gameState.animatingCardPositions[id] = startPos
@@ -156,7 +156,7 @@ class CardAnimator {
             } else if let dIndex = dealtDealerCards.firstIndex(of: card) {
                 let startPos = finalDealerPositions[id]
                     ?? CGPoint(
-                        x: CardPositioning.xForStaticCard(idx: dIndex, count: dealtDealerCards.count, size: tableSize, isDealing: false),
+                        x: CardPositioning.xForStaticCard(idx: dIndex, count: dealtDealerCards.count, size: tableSize, isDealing: false, isPlayer: false),
                         y: CardPositioning.yForHand(isPlayer: false, size: tableSize)
                     )
                 gameState.animatingCardPositions[id] = startPos

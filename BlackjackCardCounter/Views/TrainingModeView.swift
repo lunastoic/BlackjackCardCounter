@@ -11,9 +11,11 @@ struct TrainingModeView: View {
     
     // Training mode specific state
     @AppStorage("trainingDecks") private var numberOfDecks: Int = 6
-    @AppStorage("cardUnderglow") private var cardUnderglow: Bool = true
+    @AppStorage("cardUnderglow") private var cardUnderglow: Bool = true // On by default for training mode
+    @AppStorage("countPulseOverlay") private var countPulseOverlay: Bool = false // Off by default - users enable when learning
+    @State private var useTrainingCards: Bool = false // Session-only
     @State private var showSettings: Bool = false
-    @AppStorage("showStrategyHints") private var showStrategyHints: Bool = false
+    @AppStorage("showStrategyHints") private var showStrategyHints: Bool = true // On by default for training mode
     @State private var showStrategyChart: Bool = false
     @State private var selectedSettingsTab: Int = 0 // 0 = Settings, 1 = Achievements
     @AppStorage("showCardCharts") private var showCardCharts: Bool = false
@@ -32,6 +34,15 @@ struct TrainingModeView: View {
     @State private var visibleDealerCount: Int = 0
     @State private var dealerHoleRevealed: Bool = false
     @State private var discardPile: [Card] = []
+    
+    // Card skin versioning to force refresh when switching card sets
+    @State private var cardSkinVersion: Int = 0
+    
+    // Training-only card pulse overlay (counts-based)
+    @State private var pulseColor: Color = .clear
+    @State private var pulseVisible: Bool = false
+    @State private var seenPulseCardIds: Set<UUID> = []
+    @State private var pulseHideWorkItem: DispatchWorkItem?
     
     // Training-only vertical offsets to keep cards clear of count labels
     private let trainingPlayerCardYOffset: CGFloat = 6
@@ -146,6 +157,23 @@ struct TrainingModeView: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
             .ignoresSafeArea(.all, edges: .all)
+            
+            // Training-only count pulse overlay (under all game content, above background)
+            // Only show if user has enabled it in settings (off by default to encourage mental counting)
+            if countPulseOverlay && pulseVisible {
+                ZStack {
+                    ForEach(0..<3, id: \.self) { idx in
+                        Rectangle()
+                            .fill(pulseColor)
+                            .opacity(0.08 - (0.015 * Double(idx))) // 8%, 6.5%, 5% - very subtle
+                            .scaleEffect(1 + 0.05 * CGFloat(idx))
+                            .rotationEffect(.degrees(Double(idx) * 3))
+                            .ignoresSafeArea()
+                    }
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
             
             // Shoe and Deck assets - EXACT COPY FROM REGULAR MODE (behind everything)
             VStack {
@@ -365,23 +393,33 @@ struct TrainingModeView: View {
                                 Text("Dealer")
                                     .font(.headline)
                                     .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                                 Text(dealerValueLabel())
                                     .font(.system(size: 17, weight: .bold))
                                     .foregroundColor(.yellow)
+                                    .offset(y: -6) // match RegularModeView
+                                    .frame(maxWidth: .infinity, alignment: .center)
                             }
+                            .frame(maxWidth: .infinity, alignment: .center)
                             
                             // Hidden placeholders to keep layout stable (like RegularModeView)
                             HStack(spacing: 8) {
-                                ForEach(Array(gameState.dealtDealerCards.enumerated()), id: \.offset) { idx, card in
-                                TrainingModeFlipCardView(card: card,
+                                ForEach(Array(gameState.dealtDealerCards.enumerated()), id: \.element.id) { idx, card in
+                                    TrainingModeFlipCardView(
+                                        card: card,
                                         isFlipped: gameState.flippedDealerCards.contains(idx),
-                                            width: CardMetrics.cardSize.width, glowWidth: 8)
-                                        .opacity(0.0)
-                                        .transaction { $0.animation = nil }
+                                        width: CardMetrics.cardSize.width,
+                                        glowWidth: 8,
+                                        useTrainingCards: useTrainingCards
+                                    )
+                                    .opacity(0.0)
+                                    .transaction { $0.animation = nil }
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .frame(minWidth: 200, minHeight: 90)
+                            .frame(maxWidth: .infinity)
                         }
+                        .frame(height: 140)
                         
                         // Fixed spacing between dealer and player (like RegularModeView)
                         Spacer().frame(height: 32)
@@ -759,8 +797,13 @@ struct TrainingModeView: View {
             // ---- Action Buttons Overlay (ABSOLUTE POSITION) ----
             if gameState.isPlayerTurn && gameState.playerHand.count >= 2 && !isContinuousAutoPlay {
                 // Check if current active hand has blackjack or is busted (don't show buttons if so)
-                let activeHasBlackjack = gameState.isSplit && 
-                    gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                let activeHasBlackjack: Bool = {
+                    if gameState.isSplit {
+                        return gameEngine.isBlackjack(gameState.splitHands[gameState.activeHandIndex])
+                    } else {
+                        return gameEngine.isBlackjack(gameState.playerHand)
+                    }
+                }()
                 
                 let playerBusted = gameState.isSplit ? 
                     gameEngine.isBust(gameState.splitHands[gameState.activeHandIndex]) :
@@ -813,6 +856,8 @@ struct TrainingModeView: View {
                                 finalPlayerPositions.removeAll()
                                 finalDealerPositions.removeAll()
                                 finalSplitPositions = Array(repeating: [:], count: 2)
+                                seenPulseCardIds.removeAll()
+                                pulseVisible = false
                             }
 
                             let isPlayer = (index == 0 || index == 2)
@@ -871,10 +916,12 @@ struct TrainingModeView: View {
                 mgCards: mgCards,
                 isSplit: gameState.isSplit,
                 playerCardYOffset: trainingPlayerCardYOffset,
-                dealerCardYOffset: trainingDealerCardYOffset
+                dealerCardYOffset: trainingDealerCardYOffset,
+                useTrainingCards: useTrainingCards
             )
             .offset(y: gameState.isSplit ? 17 : 27) // Move up 10 points when split (27 - 10 = 17), otherwise 27 points down
             .allowsHitTesting(false)
+            .id("tm-anim-\(cardSkinVersion)") // Force refresh when switching card sets
             
             // Split cards overlay (copied from RegularModeView)
             if gameState.isSplit {
@@ -885,7 +932,8 @@ struct TrainingModeView: View {
                             if !gameState.animatingCards.keys.contains(card.id) {
                                 let pos = finalSplitPositions[handIdx][card.id] ?? CardPositioning.splitStaticPosition(handIndex: handIdx, cardIndex: cIdx, totalCards: gameState.splitHands[handIdx].count, tableSize: tableSize)
                                 let zIndex = SplitCardLayout.shared.getSplitCardZIndex(handIndex: handIdx, cardIndex: cIdx)
-                                TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8)
+                                TrainingModeFlipCardView(card: card, isFlipped: true, width: CardMetrics.cardSize.width, glowWidth: 8, useTrainingCards: useTrainingCards)
+                                    .id("\(card.id)_\(useTrainingCards)") // Force update when setting changes
                                     .matchedGeometryEffect(id: card.id, in: mgCards)
                                     .position(pos)
                                     .zIndex(zIndex)
@@ -894,6 +942,7 @@ struct TrainingModeView: View {
                                     .transition(.identity)
                             }
                         }
+                    .id("tm-split-\(cardSkinVersion)") // Force refresh when switching card sets
                     }
                     
                     // Animated split cards (in the same overlay)
@@ -901,14 +950,16 @@ struct TrainingModeView: View {
                         if let card = gameState.animatingCards[cardId],
                            let pos = gameState.animatingCardPositions[cardId] {
                             
+                            let imageName = card.imageName(isTrainingMode: true, useTrainingCardsFolder: useTrainingCards)
                             let core = ZStack {
-                                Image(card.imageName(isTrainingMode: true))
+                                Image(imageName)
                                     .resizable()
                                     .aspectRatio(0.7, contentMode: .fit)
                                     .frame(width: CardMetrics.cardSize.width, height: CardMetrics.cardSize.height)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .shadow(radius: 3)
                                     .opacity((gameState.cardFlipRotations[cardId] ?? 0) > 90 ? 1 : 0)
+                                    .id("\(imageName)_\(useTrainingCards)") // Force view update when image name or setting changes
                                     .rotation3DEffect(
                                         .degrees((gameState.cardFlipRotations[cardId] ?? 0) - 180),
                                         axis: (x: 0, y: 1, z: 0), perspective: 0.6
@@ -1139,6 +1190,8 @@ struct TrainingModeView: View {
                     selectedSettingsTab: $selectedSettingsTab,
                     numberOfDecks: $numberOfDecks,
                     cardUnderglow: $cardUnderglow,
+                    countPulseOverlay: $countPulseOverlay,
+                    useTrainingCards: $useTrainingCards,
                     showStrategyHints: $showStrategyHints,
                     showCardCharts: $showCardCharts,
                     gameState: gameState,
@@ -1158,14 +1211,38 @@ struct TrainingModeView: View {
             }
             // Ensure training mode is disabled by default when entering training mode view
             UserDefaults.standard.set(false, forKey: "trainingModeEnabled")
-            // Enable strategy hints by default in training mode for the yellow glow effect
-            if !UserDefaults.standard.bool(forKey: "showStrategyHints") {
+            
+            // Enable card underglow by default for new users (respect existing preference)
+            if UserDefaults.standard.object(forKey: "cardUnderglow") == nil {
+                UserDefaults.standard.set(true, forKey: "cardUnderglow")
+                cardUnderglow = true
+            }
+            
+            // Enable perfect strategy hints by default for new users (respect existing preference)
+            if UserDefaults.standard.object(forKey: "showStrategyHints") == nil {
                 UserDefaults.standard.set(true, forKey: "showStrategyHints")
                 showStrategyHints = true
+            }
+            
+            // Ensure count pulse overlay is OFF by default for new users (must be explicitly enabled)
+            if UserDefaults.standard.object(forKey: "countPulseOverlay") == nil {
+                UserDefaults.standard.set(false, forKey: "countPulseOverlay")
+                countPulseOverlay = false
+            }
+            
+            // Training mode cards toggle is session-only: always start OFF
+            useTrainingCards = false
+            
+            // Ensure show card charts is OFF by default for new users (must be explicitly enabled)
+            if UserDefaults.standard.object(forKey: "showCardCharts") == nil {
+                UserDefaults.standard.set(false, forKey: "showCardCharts")
+                showCardCharts = false
             }
             // Ensure all cards are visible in training mode
             visiblePlayerCount = gameState.dealtPlayerCards.count
             visibleDealerCount = gameState.dealtDealerCards.count
+            seenPulseCardIds.removeAll()
+            pulseVisible = false
         }
                 .onChange(of: gameState.dealtPlayerCards) { newCards in
             // Clear positions when cards are reset (new game) - like regular mode
@@ -1176,11 +1253,13 @@ struct TrainingModeView: View {
             // Keep visible count static to prevent layout shifts
             // visiblePlayerCount is set once on appear and stays static
             print("🎓 Training Mode: dealtPlayerCards changed to \(newCards.count) cards - keeping visiblePlayerCount static")
+            handleNewVisibleCards()
         }
         .onChange(of: gameState.dealtDealerCards) { newCards in
             // Ensure all dealt dealer cards are visible in training mode
             visibleDealerCount = newCards.count
             print("🎓 Training Mode: Updated visibleDealerCount to \(visibleDealerCount) for \(newCards.count) dealt cards")
+            handleNewVisibleCards()
         }
         .onChange(of: gameState.dealerHand.count) { dealerCount in
             // In training mode, ensure all dealer cards are visible
@@ -1198,6 +1277,13 @@ struct TrainingModeView: View {
                 // Update visiblePlayerCount to show all split cards
                 visiblePlayerCount = totalSplitCards
             }
+        }
+        // Refresh card skins whenever the training cards setting changes
+        .onChange(of: useTrainingCards) { _ in
+            cardSkinVersion += 1
+        }
+        .onChange(of: gameState.flippedDealerCards) { _ in
+            handleNewVisibleCards()
         }
         .coordinateSpace(name: "table")
         .onAppear {
@@ -1217,7 +1303,7 @@ struct TrainingModeView: View {
                 guard let gameState = gameState else { return }
                 
                 let currentCount = isPlayerCard ? gameState.dealtPlayerCards.count : gameState.dealtDealerCards.count
-                let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize)
+                let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize, isPlayer: isPlayerCard)
                 let baseY = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
                 let destination = trainingAdjustedPosition(x: x, y: baseY, isPlayer: isPlayerCard)
                 
@@ -1359,16 +1445,72 @@ struct TrainingModeView: View {
     ) {
         if isPlayerCard {
             for (index, card) in dealtPlayerCards.enumerated() {
-                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize)
+                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize, isPlayer: true)
                 let y = CardPositioning.yForHand(isPlayer: true, size: tableSize) + trainingPlayerCardYOffset
                 finalPlayerPositions[card.id] = CGPoint(x: x, y: y)
             }
         } else {
             for (index, card) in dealtDealerCards.enumerated() {
-                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize)
+                let x = CardPositioning.xForCard(index: index, count: newCount, size: tableSize, isPlayer: false)
                 let y = CardPositioning.yForHand(isPlayer: false, size: tableSize) + trainingDealerCardYOffset
                 finalDealerPositions[card.id] = CGPoint(x: x, y: y)
             }
+        }
+    }
+    
+    // MARK: - Training pulse overlay (count-based)
+    private func handleNewVisibleCards() {
+        let visible = currentVisibleFaceUpCards()
+        let newCards = visible.filter { !seenPulseCardIds.contains($0.id) }
+        guard let card = newCards.last else { return }
+        seenPulseCardIds.formUnion(newCards.map { $0.id })
+        triggerPulse(for: card)
+    }
+    
+    private func currentVisibleFaceUpCards() -> [Card] {
+        var result: [Card] = []
+        // Player cards are shown face-up in training mode
+        result.append(contentsOf: gameState.dealtPlayerCards)
+        // Dealer: only include face-up indices
+        for (idx, card) in gameState.dealtDealerCards.enumerated() {
+            if gameState.flippedDealerCards.contains(idx) || card.isFaceUp {
+                result.append(card)
+            }
+        }
+        return result
+    }
+    
+    private func triggerPulse(for card: Card) {
+        let cv = card.countValue
+        let color = colorForCountValue(cv)
+        pulseColor = color
+        
+        // Cancel any pending hide to avoid overlapping pulses
+        pulseHideWorkItem?.cancel()
+        
+        // Smooth, natural flash aligned with card flip / counter movement
+        // Use spring animation for smoother, less skippy feel
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7, blendDuration: 0)) {
+            pulseVisible = true
+        }
+        
+        let hide = DispatchWorkItem {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                pulseVisible = false
+            }
+        }
+        pulseHideWorkItem = hide
+        // Total on-screen time roughly matches flip/counter settle (~0.35–0.40s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: hide)
+    }
+    
+    private func colorForCountValue(_ count: Int) -> Color {
+        if count > 0 {
+            return Color(red: 0.0, green: 1.0, blue: 0.0) // vibrant green (matches glow)
+        } else if count < 0 {
+            return Color.red // matches negative glow
+        } else {
+            return Color.white.opacity(0.7) // neutral light gray/white
         }
     }
     
@@ -1796,6 +1938,8 @@ struct SettingsOverlay: View {
     @Binding var selectedSettingsTab: Int
     @Binding var numberOfDecks: Int
     @Binding var cardUnderglow: Bool
+    @Binding var countPulseOverlay: Bool
+    @Binding var useTrainingCards: Bool
     @Binding var showStrategyHints: Bool
     @Binding var showCardCharts: Bool
     let gameState: BlackjackGameState
@@ -1845,6 +1989,8 @@ struct SettingsOverlay: View {
                     SettingsTabView(
                         numberOfDecks: $numberOfDecks,
                         cardUnderglow: $cardUnderglow,
+                        countPulseOverlay: $countPulseOverlay,
+                        useTrainingCards: $useTrainingCards,
                         showStrategyHints: $showStrategyHints,
                         showCardCharts: $showCardCharts,
                         showSettings: $showSettings,
@@ -1859,6 +2005,7 @@ struct SettingsOverlay: View {
             .cornerRadius(24)
             .shadow(radius: 20)
             .frame(maxWidth: 340)
+            .fixedSize(horizontal: false, vertical: true) // Size dynamically based on content
             .offset(y: -UIScreen.main.bounds.height * 0.18)
         }
     }
@@ -1868,6 +2015,8 @@ struct SettingsOverlay: View {
 struct SettingsTabView: View {
     @Binding var numberOfDecks: Int
     @Binding var cardUnderglow: Bool
+    @Binding var countPulseOverlay: Bool
+    @Binding var useTrainingCards: Bool
     @Binding var showStrategyHints: Bool
     @Binding var showCardCharts: Bool
     @Binding var showSettings: Bool
@@ -1877,111 +2026,127 @@ struct SettingsTabView: View {
     var body: some View {
         VStack(spacing: 24) {
             VStack(spacing: 16) {
-                HStack {
-                    Text("Decks:")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                    Picker("Decks", selection: $numberOfDecks) {
-                        Text("1").tag(1)
-                        Text("2").tag(2)
-                        Text("4").tag(4)
-                        Text("6").tag(6)
-                        Text("8").tag(8)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .frame(width: 220)
-                    .disabled(gameState.isDealing || 
-                             (gameState.isPlayerTurn && !gameState.playerHand.isEmpty))
-                    .onChange(of: numberOfDecks) { newValue in
-                        // Check if game is finished (result message shown)
-                        let isGameFinished = gameState.resultMessage != nil
-                        
-                        // If game is finished, wait 2 seconds before allowing deck change
-                        if isGameFinished {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                // Double-check that game is still finished after delay
-                                if gameState.resultMessage != nil {
-                                    // Game is still finished, safe to change decks
-                                    gameState.dealtPlayerCards.removeAll()
-                                    gameState.dealtDealerCards.removeAll()
-                                    gameState.playerHand.removeAll()
-                                    gameState.dealerHand.removeAll()
-                                    gameState.visuallyRevealedDealerHand.removeAll()
-                                    gameState.resultMessage = nil
-                                    gameState.showNextHand = false
-                                    
-                                    gameState.numberOfDecks = newValue
-                                    // Store current deck position before reset
-                                    let currentDeckPosition = gameState.deckPosition
-                                    gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
-                                    // Restore the deck position for animation after reset
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        gameState.deckPosition = currentDeckPosition
+                    HStack {
+                        Text("Decks:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Picker("Decks", selection: $numberOfDecks) {
+                            Text("1").tag(1)
+                            Text("2").tag(2)
+                            Text("4").tag(4)
+                            Text("6").tag(6)
+                            Text("8").tag(8)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .frame(width: 220)
+                        .disabled(gameState.isDealing || 
+                                 (gameState.isPlayerTurn && !gameState.playerHand.isEmpty))
+                        .onChange(of: numberOfDecks) { newValue in
+                            // Check if game is finished (result message shown)
+                            let isGameFinished = gameState.resultMessage != nil
+                            
+                            // If game is finished, wait 2 seconds before allowing deck change
+                            if isGameFinished {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                    // Double-check that game is still finished after delay
+                                    if gameState.resultMessage != nil {
+                                        // Game is still finished, safe to change decks
+                                        gameState.dealtPlayerCards.removeAll()
+                                        gameState.dealtDealerCards.removeAll()
+                                        gameState.playerHand.removeAll()
+                                        gameState.dealerHand.removeAll()
+                                        gameState.visuallyRevealedDealerHand.removeAll()
+                                        gameState.resultMessage = nil
+                                        gameState.showNextHand = false
+                                        
+                                        gameState.numberOfDecks = newValue
+                                        // Store current deck position before reset
+                                        let currentDeckPosition = gameState.deckPosition
+                                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
+                                        // Restore the deck position for animation after reset
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                            gameState.deckPosition = currentDeckPosition
+                                        }
                                     }
                                 }
+                                return
                             }
-                            return
-                        }
-                        
-                        // Game is not finished, safe to change decks immediately
-                        gameState.dealtPlayerCards.removeAll()
-                        gameState.dealtDealerCards.removeAll()
-                        gameState.playerHand.removeAll()
-                        gameState.dealerHand.removeAll()
-                        gameState.visuallyRevealedDealerHand.removeAll()
-                        gameState.resultMessage = nil
-                        gameState.showNextHand = false
-                        
-                        gameState.numberOfDecks = newValue
-                        // Store current deck position before reset
-                        let currentDeckPosition = gameState.deckPosition
-                        gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
-                        // Restore the deck position for animation after reset
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            gameState.deckPosition = currentDeckPosition
+                            
+                            // Game is not finished, safe to change decks immediately
+                            gameState.dealtPlayerCards.removeAll()
+                            gameState.dealtDealerCards.removeAll()
+                            gameState.playerHand.removeAll()
+                            gameState.dealerHand.removeAll()
+                            gameState.visuallyRevealedDealerHand.removeAll()
+                            gameState.resultMessage = nil
+                            gameState.showNextHand = false
+                            
+                            gameState.numberOfDecks = newValue
+                            // Store current deck position before reset
+                            let currentDeckPosition = gameState.deckPosition
+                            gameEngine.resetDeck(gameState: gameState, numberOfDecks: newValue)
+                            // Restore the deck position for animation after reset
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                gameState.deckPosition = currentDeckPosition
+                            }
                         }
                     }
+                    
+                    HStack {
+                        Text("Card Underglow:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Toggle("", isOn: $cardUnderglow)
+                            .labelsHidden()
+                    }
+                    
+                    HStack {
+                        Text("Count Pulse Overlay:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Toggle("", isOn: $countPulseOverlay)
+                            .labelsHidden()
+                    }
+                    
+                    HStack {
+                        Text("Training Cards:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Toggle("", isOn: $useTrainingCards)
+                            .labelsHidden()
+                    }
+                    
+                    HStack {
+                        Text("Show Perfect Strategy Hints:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Toggle("", isOn: $showStrategyHints)
+                            .labelsHidden()
+                    }
+                    
+                    HStack {
+                        Text("Show Card Charts:")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        Toggle("", isOn: $showCardCharts)
+                            .labelsHidden()
+                    }
+                    
                 }
                 
-                HStack {
-                    Text("Card Underglow:")
-                        .foregroundColor(.white)
+                Button(action: { showSettings = false }) {
+                    Text("Close")
                         .font(.headline)
-                    Toggle("", isOn: $cardUnderglow)
-                        .labelsHidden()
-                }
-                
-                HStack {
-                    Text("Show Perfect Strategy Hints:")
                         .foregroundColor(.white)
-                        .font(.headline)
-                    Toggle("", isOn: $showStrategyHints)
-                        .labelsHidden()
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: "ff0000"))
+                        .cornerRadius(12)
                 }
-                
-                HStack {
-                    Text("Show Card Charts:")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                    Toggle("", isOn: $showCardCharts)
-                        .labelsHidden()
-                }
-                
+                .padding(.bottom, 24)
             }
-            
-            Button(action: { showSettings = false }) {
-                Text("Close")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "ff0000"))
-                    .cornerRadius(12)
-            }
-            .padding(.bottom, 24)
-        }
-        .frame(maxWidth: 340)
-        .padding(.top, 24)
+            .frame(maxWidth: 340)
+            .padding(.top, 24)
     }
 }
 
