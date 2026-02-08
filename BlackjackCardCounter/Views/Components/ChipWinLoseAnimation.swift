@@ -808,36 +808,65 @@ struct ChipWinLoseAnimation: View {
             ? getChipSelectionPosition()
             : CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.height * 0.9)
         
+        // Get the actual betting position for accurate chip placement
+        let bettingPos = gameState.isTrainingMode 
+            ? getTrainingModeBettingPosition() 
+            : getRegularModeBettingPosition()
+        let centerX = bettingPos.x
+        let baseY = bettingPos.y
+        
+        // Apply Y offset to match win animations (training mode uses +97, regular mode uses +0)
+        let chipYOffset: CGFloat = gameState.isTrainingMode ? 97 : 0
+        let adjustedBaseY = baseY + chipYOffset
+        
         // Build a list of on-table stacks to animate (bet + additional + DD)
         var tableChips: [AnimatedChip] = []
         
-        // Include main bet chips (approximate their current on-table positions)
+        // Include main bet chips using the same spiral logic as the betting view
         if !gameState.betChips.isEmpty {
-            let centerX = UIScreen.main.bounds.width * 0.5
-            let baseY = gameState.isTrainingMode
-                ? UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
-                : UIScreen.main.bounds.height * 0.75
+            // Calculate user chip position (same as in win animations)
+            let chipSize: CGFloat = 44.0
+            let chipSpacing: CGFloat = chipSize + 1.0 // 45pt: touching
+            let payoutCount = winChips.isEmpty ? 0 : 1 // Check if payout chips exist
+            let userStackCount = gameState.betChips.count
+            let totalCount = payoutCount + userStackCount
+            let rowStartRelative = -chipSpacing * CGFloat(max(totalCount - 1, 0)) / 2.0
+            let firstUserXRelative = rowStartRelative + CGFloat(payoutCount) * chipSpacing
+            let userChipX = centerX + firstUserXRelative
+            
+            // Create bet chips at their actual positions (spiral layout)
             for (index, chipValue) in gameState.betChips.enumerated() {
-                let angle = Double(index) * 0.8
+                let angle = Double(index) * 0.8  // Same spiral as betting view
                 let radius: CGFloat = 2.0
                 let xOffset = radius * cos(angle)
                 let yOffset = radius * sin(angle)
+                
+                // Calculate X position: start from userChipX and spiral
+                let chipX = userChipX + xOffset
+                let chipY = adjustedBaseY + yOffset
+                
                 tableChips.append(AnimatedChip(
                     id: UUID(),
                     value: chipValue,
-                    position: CGPoint(x: centerX - 52.5 + xOffset, y: baseY + yOffset),
+                    position: CGPoint(x: chipX, y: chipY),
                     opacity: 1.0,
                     scale: 1.0
                 ))
             }
         }
         
-        // Include additional/right stack chips
+        // Include additional/right stack chips (for splits/double-down)
         if !gameState.additionalBetChips.isEmpty {
-            let centerX = UIScreen.main.bounds.width * 0.5
-            let baseY = gameState.isTrainingMode
-                ? UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
-                : UIScreen.main.bounds.height * 0.75
+            // Calculate position relative to betting area (right side)
+            let chipSize: CGFloat = 44.0
+            let chipSpacing: CGFloat = chipSize + 1.0
+            let payoutCount = winChips.isEmpty ? 0 : 1
+            let mainStackCount = gameState.betChips.count
+            let additionalStackCount = gameState.additionalBetChips.count
+            
+            // Right stack is typically 45pt to the right of main stack
+            let rightStackX = centerX + chipSpacing
+            
             for (index, chipValue) in gameState.additionalBetChips.enumerated() {
                 let angle = Double(index) * 0.8
                 let radius: CGFloat = 2.0
@@ -846,7 +875,7 @@ struct ChipWinLoseAnimation: View {
                 tableChips.append(AnimatedChip(
                     id: UUID(),
                     value: chipValue,
-                    position: CGPoint(x: centerX + 97.5 + xOffset, y: baseY + yOffset),
+                    position: CGPoint(x: rightStackX + xOffset, y: adjustedBaseY + yOffset),
                     opacity: 1.0,
                     scale: 1.0
                 ))
@@ -855,25 +884,11 @@ struct ChipWinLoseAnimation: View {
         
         // Include double-down stacks if present
         if !gameState.doubleDownChipsHand2.isEmpty {
-            let centerX = UIScreen.main.bounds.width * 0.5
-            let baseY = gameState.isTrainingMode
-                ? UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
-                : UIScreen.main.bounds.height * 0.75
-            // Calculate position to match TrainingModeView's hand2DDXOffset calculation
-            // Hand 2 double down chips: Position to the LEFT of bet chips (44 points to the left, touching)
-            // Bet chips are at -70.0, so DD chips at -70.0 - 44.0 = -114.0
-            // When payout chips are present, betting chips are offset right by 2 chip widths
-            let hand2Won = gameState.resultMessage?.contains("Hand 2: Win") == true
-            let h2PayoutShift: CGFloat = hand2Won ? 184.0 : 0.0
-            let hasPayoutChips = gameState.lastPayout > 0 && gameState.showResultNotification
-            let _: CGFloat = 45.0 // chipSize (44) + 1
-            // When payout chips are present, the on-table stacks shift right by 36pt (TrainingModeView),
-            // plus a small inter-hand gap tweak to match the Figma mock.
-            let payoutOffset: CGFloat = hasPayoutChips ? 36.0 : 0.0
-            let _: CGFloat = hasPayoutChips ? -1.0 : 0.0
-            let _: CGFloat = hasPayoutChips ? 7.0 : 0.0
-            let hand2DDXOffset: CGFloat = gameState.isSplit ? 
-                (-114.0 + h2PayoutShift + payoutOffset) : 0.0
+            let chipSize: CGFloat = 44.0
+            let chipSpacing: CGFloat = chipSize + 1.0
+            // Hand 2 double down chips are typically to the left of bet chips
+            let dd2X = centerX - chipSpacing
+            
             for (index, chipValue) in gameState.doubleDownChipsHand2.enumerated() {
                 let angle = Double(index) * 0.8
                 let radius: CGFloat = 2.0
@@ -882,7 +897,7 @@ struct ChipWinLoseAnimation: View {
                 tableChips.append(AnimatedChip(
                     id: UUID(),
                     value: chipValue,
-                    position: CGPoint(x: centerX + hand2DDXOffset + xOffset, y: baseY + yOffset),
+                    position: CGPoint(x: dd2X + xOffset, y: adjustedBaseY + yOffset),
                     opacity: 1.0,
                     scale: 1.0
                 ))
@@ -890,10 +905,12 @@ struct ChipWinLoseAnimation: View {
         }
         
         if !gameState.doubleDownChipsHand1.isEmpty {
-            let centerX = UIScreen.main.bounds.width * 0.5
-            let baseY = gameState.isTrainingMode
-                ? UIScreen.main.bounds.height * 0.7 - 30 - 88 + 50
-                : UIScreen.main.bounds.height * 0.75
+            let chipSize: CGFloat = 44.0
+            let chipSpacing: CGFloat = chipSize + 1.0
+            // Hand 1 double down chips are typically to the left of additional bet chips
+            let additionalStackX = centerX + chipSpacing
+            let dd1X = additionalStackX - chipSpacing
+            
             for (index, chipValue) in gameState.doubleDownChipsHand1.enumerated() {
                 let angle = Double(index) * 0.8
                 let radius: CGFloat = 2.0
@@ -902,23 +919,30 @@ struct ChipWinLoseAnimation: View {
                 tableChips.append(AnimatedChip(
                     id: UUID(),
                     value: chipValue,
-                    position: CGPoint(x: centerX + 57.5 + xOffset, y: baseY + yOffset),
+                    position: CGPoint(x: dd1X + xOffset, y: adjustedBaseY + yOffset),
                     opacity: 1.0,
                     scale: 1.0
                 ))
             }
         }
         
-        // Animate both winnings (winChips) and table chips together toward target
+        // Hide actual bet chips during animation so only animated chips are visible
+        gameState.hideBetChipsDuringLoseAnimation = true
+        
+        // Add bet chips to winChips so they use the exact same animation as payout chips
+        winChips.append(contentsOf: tableChips)
+        
+        // Animate all chips (payout + bet) together toward target using the same animation
         let animationDuration = 0.6
         
         // If nothing to animate, end immediately (prevents Return Bet being hidden too long)
-        if winChips.isEmpty && tableChips.isEmpty {
+        if winChips.isEmpty {
             gameState.isAutoCollectingWinnings = false
+            gameState.hideBetChipsDuringLoseAnimation = false
             return
         }
         
-        // Animate existing winChips (winnings)
+        // Animate all chips (payout chips + bet chips) simultaneously with the exact same animation
         withAnimation(.easeInOut(duration: animationDuration)) {
             for i in 0..<winChips.count {
                 winChips[i].position = targetPos
@@ -927,21 +951,17 @@ struct ChipWinLoseAnimation: View {
             }
         }
         
-        // Use loseChips to animate the table stacks
-        loseChips = tableChips
-        
-        withAnimation(.easeInOut(duration: animationDuration)) {
-            for i in 0..<loseChips.count {
-                loseChips[i].position = targetPos
-                loseChips[i].opacity = 0.0
-                loseChips[i].scale = 0.6
-            }
-        }
-        
         DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration + 0.1) {
             winChips.removeAll()
-            loseChips.removeAll()
+            // Clear bet chips and display chip after animation completes
+            gameState.betChips = []
+            gameState.additionalBetChips = []
+            gameState.doubleDownChipsHand1 = []
+            gameState.doubleDownChipsHand2 = []
+            gameState.displayChip = nil // Clear display chip to prevent it from reappearing
+            gameState.hideBetChipsDuringLoseAnimation = false
             gameState.isAutoCollectingWinnings = false
+            print("💰 AUTO-COLLECT: Animation complete, all chips cleared (winChips, betChips, displayChip, additionalBetChips)")
         }
     }
     

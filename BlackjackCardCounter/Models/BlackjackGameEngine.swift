@@ -1076,11 +1076,9 @@ class BlackjackGameEngine: ObservableObject {
                 
                 print("💰 Auto-collecting winnings back to player stash after payout")
                 gameState.autoCollectWinningsToggle.toggle()
+                // Don't clear chips here - let the animation function clear them after animation completes
+                // This ensures both payout chips (winChips) and bet chips are visible during animation
                 gameState.playerBet = 0
-                gameState.betChips = []
-                gameState.additionalBetChips = []
-                gameState.doubleDownChipsHand1 = []
-                gameState.doubleDownChipsHand2 = []
                 gameState.displayBetAmount = 0
                 gameState.userPlacedCurrentBet = false
             }
