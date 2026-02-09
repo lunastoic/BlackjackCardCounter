@@ -68,20 +68,14 @@ struct BlackjackBettingView: View {
                                 .allowsHitTesting(false)
                         } else if !gameState.hasEverDealtCards {
                             // Before dealing: Show stacked chips
-                            // Before dealing: Show stacked chips - show largest chip on top
                             ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
                                 // Spiral ALL chips in one stack: highest value at bottom, smallest at top
-                                let angle = Double(index) * 0.8  // Tighter spiral
-                                let radius: CGFloat = 2.0        // Closer stacking
+                                let angle = Double(index) * 0.8
+                                let radius: CGFloat = 2.0
                                 let xOffset = radius * cos(angle)
                                 let yOffset = radius * sin(angle)
 
-                                ZStack {
-                                    Circle()
-                                        .fill(debugColors[index % debugColors.count])
-                                        .frame(width: 44, height: 44)
-                                    ChipView(chip: Chip(value: chipValue), gameState: gameState)
-                                }
+                                ChipView(chip: Chip(value: chipValue), gameState: gameState)
                                     .offset(x: xOffset, y: yOffset)
                                     .zIndex(20000 + Double(index)) // force overlay above chips
                                     .opacity(gameState.hideBetChipsDuringLoseAnimation ? 0 : 1)
@@ -270,7 +264,6 @@ struct ChipSelectionView: View {
                                 .stroke(pressedChip == value ? Color.yellow : Color.white.opacity(0.5), lineWidth: pressedChip == value ? 3 : 2)
                         )
                 }
-                .disabled(!bettingManager.canPlaceBet(gameState: gameState, chipValue: value))
                 .background(
                     GeometryReader { geometry in
                         Color.clear
@@ -338,17 +331,22 @@ struct DealNextHandButtons: View {
     }
 
     private var hasPlacedChip: Bool {
-        gameState.userPlacedCurrentBet && gameState.playerBet > 0 && !gameState.betChips.isEmpty
+        // Consider any visible bet chips as a valid placed bet
+        gameState.playerBet > 0 && !gameState.betChips.isEmpty
     }
     private var dealButtonOpacity: Double { hasPlacedChip ? 1.0 : 0.2 }
     private var dealButtonSaturation: Double { hasPlacedChip ? 1.0 : 0.0 }
 
     // Only hide during active gameplay (dealing cards or player turn with cards)
     // Dealer turn is handled separately - only hide if round is still in progress (showNextHand is true)
+    // IMPORTANT: If showNextHand is false, the round has ended, so we're not in active gameplay
     private var isActiveGameplay: Bool {
-        (gameState.isDealing && gameState.playerHand.count >= 2) || 
-        (gameState.isPlayerTurn && gameState.playerHand.count >= 2) ||
-        gameState.isProcessingAction
+        // If round has ended (showNextHand is false), we're not in active gameplay
+        guard gameState.showNextHand else { return false }
+        
+        return (gameState.isDealing && gameState.playerHand.count >= 2) || 
+               (gameState.isPlayerTurn && gameState.playerHand.count >= 2) ||
+               gameState.isProcessingAction
     }
     
     // Hide buttons during dealer's turn ONLY if round is still in progress (showNextHand is true)
@@ -413,6 +411,8 @@ struct DealNextHandButtons: View {
                         gameState.chipsMinimized = true
                         gameState.hasEverDealtCards = true
                         gameState.isDealing = true
+                        // Hide chip selection/buttons immediately to prevent brief re-show
+                        gameState.showNextHand = true
                     }
 
                     gameState.additionalBetChips = []
@@ -447,7 +447,7 @@ struct DealNextHandButtons: View {
                     }
                     .opacity(dealButtonOpacity)
                 }
-                .disabled(!hasPlacedChip || gameState.isCollectingPhase)
+                .disabled(!hasPlacedChip)
             }
             .frame(maxWidth: 440)
             .padding(.horizontal)

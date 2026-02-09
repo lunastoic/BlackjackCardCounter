@@ -967,6 +967,10 @@ class BlackjackGameEngine: ObservableObject {
             }
         }
         
+        // Set showNextHand to false immediately when round ends to ensure buttons are visible
+        // This fixes the issue where buttons don't show when forced blackjack is off
+        gameState.showNextHand = false
+        
         handleGameResult(gameState: gameState, payout: payout)
         gameState.resultMessage = msg
         gameState.showPostGameButtons = true // Show buttons after game ends

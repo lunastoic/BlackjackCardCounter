@@ -40,6 +40,10 @@ struct RegularModeView: View {
     @State private var selectedSettingsTab: Int = 0
     @AppStorage("regularDecks") private var numberOfDecks: Int = 6
     
+    // Match Training vertical offsets for cards
+    private let regularPlayerCardYOffset: CGFloat = 6
+    private let regularDealerCardYOffset: CGFloat = 15
+    
     var body: some View {
         GeometryReader { tableGeo in
         ZStack {
@@ -401,21 +405,19 @@ struct RegularModeView: View {
                                 gameState: gameState,
                                 bettingManager: bettingManager
                             )
-                            .disabled(gameState.isDealing)
-                            .offset(y: 0) // Explicitly set to prevent any shifts
+                            .offset(y: 0)
+                            .zIndex(100000)
+                            .allowsHitTesting(true)
                         }
                         
                         
                     }
                     
-                    // ALWAYS show buttons when chip selection is visible - simplified logic
+                    // Match Training Mode logic: show when chip selection visible OR showing result
                     let chipSelectionVisible = !gameState.showNextHand
                     let showingResult = (gameState.resultMessage != nil && gameState.showResultNotification) || gameState.showPostGameButtons
-                    let isActiveGameplay = (gameState.playerHand.count >= 2 && gameState.isPlayerTurn) || 
-                                          (gameState.isDealing && gameState.playerHand.count >= 2) ||
-                                          gameState.isProcessingAction
-                    // Hide buttons during dealer's turn ONLY if round is still in progress (showNextHand is true)
-                    // After round ends (showNextHand is false), show buttons regardless of dealer turn status
+                    let isActiveGameplay = (gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
+                    // Hide during dealer turn ONLY if round in progress
                     let dealerHasCards = !gameState.dealerHand.isEmpty
                     let dealerTurnInProgress = gameState.showNextHand && dealerHasCards && !gameState.isPlayerTurn && !gameState.isDealing
                     
@@ -443,7 +445,8 @@ struct RegularModeView: View {
                                     let midX = tableSize.width * 0.5
                                     let startX = midX - (CardMetrics.cardSpacing / 2)
                                     let x = startX + CGFloat(slotIndex) * CardMetrics.cardSpacing
-                                    let y = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                                    let yBase = CardPositioning.yForHand(isPlayer: isPlayer, size: tableSize)
+                                    let y = yBase + (isPlayer ? regularPlayerCardYOffset : regularDealerCardYOffset)
                                     let destination = CGPoint(x: x, y: y)
 
                                     if isPlayer { finalPlayerPositions[card.id] = destination }
@@ -556,7 +559,7 @@ struct RegularModeView: View {
                 
                 let currentCount = isPlayerCard ? gameState.dealtPlayerCards.count : gameState.dealtDealerCards.count
                 let x = CardPositioning.xForCard(index: currentCount, count: currentCount + 1, size: tableSize, isPlayer: isPlayerCard)
-                let y = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize)
+                let y = CardPositioning.yForHand(isPlayer: isPlayerCard, size: tableSize) + (isPlayerCard ? regularPlayerCardYOffset : regularDealerCardYOffset)
                 let destination = CGPoint(x: x, y: y)
                 
                 CardPositioning.recalculateAllCardPositions(
@@ -568,6 +571,16 @@ struct RegularModeView: View {
                     finalPlayerPositions: &finalPlayerPositions,
                     finalDealerPositions: &finalDealerPositions
                 )
+                // Apply training-like Y offsets to final positions
+                if isPlayerCard {
+                    for (id, pos) in finalPlayerPositions {
+                        finalPlayerPositions[id] = CGPoint(x: pos.x, y: pos.y + regularPlayerCardYOffset)
+                    }
+                } else {
+                    for (id, pos) in finalDealerPositions {
+                        finalDealerPositions[id] = CGPoint(x: pos.x, y: pos.y + regularDealerCardYOffset)
+                    }
+                }
 
                 CardAnimator.animateHit(
                     card: card,
@@ -791,18 +804,21 @@ struct RegularModeView: View {
         ZStack {
             // CRITICAL: Check displayChip FIRST - if set, show it (even if flags aren't set yet)
             // This prevents any gap where nothing is shown
+            // Only show displayChip during active gameplay (when round is in progress)
             if let displayChip = gameState.displayChip,
                let map = gameState.currentMap,
                map.assetConfig.chipImages.keys.contains(displayChip),
-               gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation {
-                // During gameplay: Show ONLY displayChip
+               gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation,
+               gameState.showNextHand {
+                // During active gameplay: Show ONLY displayChip
                 ChipView(chip: Chip(value: displayChip), gameState: gameState)
                     .opacity(1)
                     .allowsHitTesting(false)
-            } else if !gameState.hasEverDealtCards {
-                // Before dealing: Show stacked chips
-                // Before dealing: Show stacked chips (top chip is visible)
-                // Before dealing: Show stacked chips
+            } else if !gameState.hasEverDealtCards || !gameState.showNextHand || !gameState.chipsMinimized {
+                // Show stacked chips if:
+                // 1. Cards haven't been dealt yet (!hasEverDealtCards), OR
+                // 2. Round has ended (!showNextHand), OR
+                // 3. Chips aren't minimized (!chipsMinimized)
                 ForEach(Array(chips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
                     let angle = Double(index) * 0.8
                     let radius: CGFloat = 2.0

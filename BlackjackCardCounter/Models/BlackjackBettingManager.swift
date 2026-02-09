@@ -25,10 +25,11 @@ class BlackjackBettingManager: ObservableObject {
         if chipValue <= XPChipManager.shared.userChips {
             // Starting a new betting sequence: clear any prior display amount from previous round
             gameState.displayBetAmount = 0
-            // Reset the hide flag to ensure chips are visible
+            // Reset flags so UI/buttons aren't blocked
             gameState.hideBetChipsDuringLoseAnimation = false
-            // If a previous win is mid auto-collect, cancel the "hide Return Bet" gating.
             gameState.isAutoCollectingWinnings = false
+            gameState.isCollectingPhase = false
+            gameState.isDealing = false        // ensure Deal Cards tap isn't short-circuited
             gameState.userPlacedCurrentBet = true
             // Handle previous round results when placing new bet
             if gameState.resultMessage != nil {
@@ -152,6 +153,13 @@ class BlackjackBettingManager: ObservableObject {
         guard let previousBet = gameState.lastBet, 
               XPChipManager.shared.userChips >= previousBet else { return }
         
+        // Reset blocking flags so buttons/actions are enabled immediately
+        gameState.isDealing = false
+        gameState.isCollectingPhase = false
+        gameState.isProcessingAction = false
+        gameState.showNextHand = false
+        gameState.userPlacedCurrentBet = true
+        
         print("🔄 REDO BET: Original bet was \(previousBet)")
         print("🔄 REDO BET: Current playerBet is \(gameState.playerBet)")
         print("🔄 REDO BET: Current betChips: \(gameState.betChips)")
@@ -219,6 +227,11 @@ class BlackjackBettingManager: ObservableObject {
         
         gameState.betChips.append(contentsOf: newChips)
         
+        // Reset chip display flags so chips are visible after redo bet
+        // This ensures chips show up visibly when redo bet is clicked
+        gameState.hasEverDealtCards = false
+        gameState.chipsMinimized = false
+        
         // Store the largest chip from ALL chips (new + existing) for gameplay minimization
         // This ensures we always track the top chip the user wants to see
         let allChips = gameState.betChips + newChips
@@ -256,12 +269,27 @@ class BlackjackBettingManager: ObservableObject {
     }
     
     func canPlaceBet(gameState: BlackjackGameState, chipValue: Int) -> Bool {
+        // Only block while actively dealing
+        if gameState.isDealing {
+            print("🎰 canPlaceBet: Blocked - isDealing=\(gameState.isDealing)")
+            return false
+        }
+        
         // Check if we have enough remaining chips to place this additional bet
-        guard chipValue <= XPChipManager.shared.userChips else { return false }
+        guard chipValue <= XPChipManager.shared.userChips else { 
+            print("🎰 canPlaceBet: Insufficient chips - need \(chipValue), have \(XPChipManager.shared.userChips)")
+            return false 
+        }
         
         // Check if adding this chip would exceed max bet per hand
         let newBet = gameState.playerBet + chipValue
-        return newBet <= gameState.maxBet
+        let canPlace = newBet <= gameState.maxBet
+        if !canPlace {
+            print("🎰 canPlaceBet: Would exceed max bet - current bet: \(gameState.playerBet), adding: \(chipValue), max: \(gameState.maxBet)")
+        } else {
+            print("🎰 canPlaceBet: ALLOWED - chipValue=\(chipValue), playerBet=\(gameState.playerBet), newBet=\(newBet), maxBet=\(gameState.maxBet)")
+        }
+        return canPlace
     }
     
     func canRedoBet(gameState: BlackjackGameState) -> Bool {

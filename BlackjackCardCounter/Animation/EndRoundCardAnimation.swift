@@ -328,25 +328,10 @@ class EndRoundCardAnimation {
         gameState.flippedDealerCards.removeAll()
         gameState.countingRevealedDealerCards.removeAll()
         
-        // IMPORTANT: In training mode, preserve the button positioning state
-        // by setting a flag that indicates cards were just collected
+        // IMPORTANT: Do not force showNextHand back to true here; we want post-hand UI to appear
+        // for both training and regular modes once the round is over.
         let trainingModeEnabled = UserDefaults.standard.bool(forKey: "trainingModeEnabled")
-        if trainingModeEnabled {
-            // Set a flag to maintain button positioning after card collection
-            gameState.showNextHand = true // This helps maintain button positioning
-            gameState.cardsJustCollected = true // Track that cards were just collected
-            gameState.isPlayerTurn = true // Ensure player turn state is maintained
-            print("🎯 EndRound: Training mode - preserving button positioning after card collection")
-            print("🎯 EndRound: Training mode - showNextHand=\(gameState.showNextHand), cardsJustCollected=\(gameState.cardsJustCollected)")
-            
-            // Add a small delay to ensure these flags stick and override any other changes
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                gameState.showNextHand = true
-                gameState.cardsJustCollected = true
-                gameState.isPlayerTurn = true
-                print("🎯 EndRound: Training mode - reinforced button positioning flags after 0.1s delay")
-            }
-        }
+        gameState.cardsJustCollected = trainingModeEnabled
         
         // Update cards dealt count (keep track of total cards dealt)
         gameState.cardsDealt += collectedCards.count

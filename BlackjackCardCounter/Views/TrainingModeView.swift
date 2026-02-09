@@ -1,4 +1,5 @@
 import SwiftUI
+// TrainingTabView lives in Components
 
 struct TrainingModeView: View {
     let map: Map
@@ -17,7 +18,7 @@ struct TrainingModeView: View {
     @State private var showSettings: Bool = false
     @AppStorage("showStrategyHints") private var showStrategyHints: Bool = true // On by default for training mode
     @State private var showStrategyChart: Bool = false
-    @State private var selectedSettingsTab: Int = 0 // 0 = Settings, 1 = Achievements
+    @State private var selectedSettingsTab: Int = 0 // 0 = Achievements, 1 = Training, 2 = Settings
     @AppStorage("showCardCharts") private var showCardCharts: Bool = false
     @State private var selectedChart: Int = 0 // 0 = Dealt, 1 = Remaining
     
@@ -1098,11 +1099,16 @@ struct TrainingModeView: View {
                         .foregroundColor(.yellow)
                         .padding(.vertical, 5)
                     
-                    // Unknown Button on the left (Training Mode only) - with autoplay logic
+                    // Autoplay (Training-only) – align gating with Return Bet/Regular logic
                     HStack {
-                        if !isContinuousAutoPlay && !gameState.isDealing && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand) && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
+                        let dealerIsFlippingAuto = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
+                        let handInProgressAuto = gameState.isDealing || gameState.isProcessingAction || dealerIsFlippingAuto
+                        if !isContinuousAutoPlay
+                            && !handInProgressAuto
+                            && !gameState.betChips.isEmpty
+                            && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand)
+                            && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
                             Button(action: {
-                                // Start auto play mode (same as training mode enabled)
                                 UserDefaults.standard.set(true, forKey: "trainingModeEnabled")
                                 startContinuousAutoPlay()
                             }) {
@@ -1118,8 +1124,7 @@ struct TrainingModeView: View {
                         Spacer()
                     }
                     
-                    // Return Bet Button on the right
-                    // Hide during dealer turn (flipping cards) or when hand is in progress
+                    // Return Bet Button on the right (match Regular logic)
                     let dealerIsFlipping = !gameState.isPlayerTurn && !gameState.dealerHand.isEmpty && !gameState.isDealing
                     let handInProgressHere = gameState.isDealing || gameState.isProcessingAction || dealerIsFlipping
                     
@@ -1129,8 +1134,7 @@ struct TrainingModeView: View {
                             && !gameState.betChips.isEmpty
                             && !handInProgressHere
                             && (gameState.resultMessage != nil || gameState.isCollectingPhase || !gameState.showNextHand)
-                            && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn)
-                            && !isContinuousAutoPlay {
+                            && !(gameState.playerHand.count >= 2 && gameState.isPlayerTurn) {
                             Button(action: {
                                 bettingManager.returnBet(gameState: gameState)
                             }) {
@@ -1177,10 +1181,9 @@ struct TrainingModeView: View {
                         gameState: gameState,
                         bettingManager: bettingManager
                     )
-                    .disabled(gameState.isDealing)
-                    // Shift down slightly to match Regular Mode spacing under Win/Lose text
                     .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height * 0.7 - 30 - 88 + 160 - 1)
-                    .zIndex(1001)
+                    .zIndex(100000)
+                    .allowsHitTesting(true)
                 }
             }
             
@@ -1952,13 +1955,13 @@ struct SettingsOverlay: View {
         
         VStack(spacing: 0) {
             VStack(spacing: 0) {
-                // Tab bar
+                // Tab bar (Achievements | Training | Settings)
                 HStack(spacing: 0) {
                     Button(action: { selectedSettingsTab = 0 }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "gearshape.fill")
+                            Image(systemName: "trophy.fill")
                                 .font(.title2)
-                            Text("Settings")
+                            Text("Achievements")
                                 .font(.headline)
                         }
                         .padding(.vertical, 12)
@@ -1970,9 +1973,9 @@ struct SettingsOverlay: View {
                     
                     Button(action: { selectedSettingsTab = 1 }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "trophy.fill")
+                            Image(systemName: "graduationcap.fill")
                                 .font(.title2)
-                            Text("Achievements")
+                            Text("Training")
                                 .font(.headline)
                         }
                         .padding(.vertical, 12)
@@ -1981,11 +1984,29 @@ struct SettingsOverlay: View {
                         .foregroundColor(selectedSettingsTab == 1 ? .yellow : .white)
                         .opacity(selectedSettingsTab == 1 ? 1.0 : 0.5)
                     }
+                    
+                    Button(action: { selectedSettingsTab = 2 }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title2)
+                            Text("Settings")
+                                .font(.headline)
+                        }
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(selectedSettingsTab == 2 ? Color(hex: "23272a") : Color.clear)
+                        .foregroundColor(selectedSettingsTab == 2 ? .yellow : .white)
+                        .opacity(selectedSettingsTab == 2 ? 1.0 : 0.5)
+                    }
                 }
                 .background(Color(hex: "1a1a2e").opacity(0.95))
                 
                 // Tab content
                 if selectedSettingsTab == 0 {
+                    AchievementsTabView()
+                } else if selectedSettingsTab == 1 {
+                    TrainingTabView(showSettings: $showSettings)
+                } else {
                     SettingsTabView(
                         numberOfDecks: $numberOfDecks,
                         cardUnderglow: $cardUnderglow,
@@ -1997,8 +2018,6 @@ struct SettingsOverlay: View {
                         gameState: gameState,
                         gameEngine: gameEngine
                     )
-                } else {
-                    AchievementsTabView()
                 }
             }
             .background(Color(hex: "16213e").opacity(0.95))
@@ -2245,18 +2264,21 @@ struct BettingAreaView: View {
             ZStack {
                 // CRITICAL: Check displayChip FIRST - if set, show it (even if flags aren't set yet)
                 // This prevents any gap where nothing is shown
+                // Only show displayChip during active gameplay (when round is in progress)
                 if let displayChip = gameState.displayChip,
                    let map = gameState.currentMap,
                    map.assetConfig.chipImages.keys.contains(displayChip),
-                   gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation {
-                    // During gameplay: Show ONLY displayChip
+                   gameState.hasEverDealtCards && gameState.chipsMinimized && !gameState.hideBetChipsDuringLoseAnimation,
+                   gameState.showNextHand {
+                    // During active gameplay: Show ONLY displayChip
                     ChipView(chip: Chip(value: displayChip), gameState: gameState)
                         .opacity(1)
                         .allowsHitTesting(false)
-                } else if !gameState.hasEverDealtCards {
-                    // Before dealing: Show stacked chips
-                    // Before dealing: Show stacked chips (top chip is visible)
-                    // Before dealing: Show stacked chips
+                } else if !gameState.hasEverDealtCards || !gameState.showNextHand || !gameState.chipsMinimized {
+                    // Show stacked chips if:
+                    // 1. Cards haven't been dealt yet (!hasEverDealtCards), OR
+                    // 2. Round has ended (!showNextHand), OR
+                    // 3. Chips aren't minimized (!chipsMinimized)
                     ForEach(Array(gameState.betChips.sorted(by: >).enumerated()), id: \.offset) { index, chipValue in
                         let angle = Double(index) * 0.8
                         let radius: CGFloat = 2.0
@@ -2345,7 +2367,9 @@ struct BettingAreaView: View {
                     gameState: gameState,
                     bettingManager: bettingManager
                 )
-                .disabled(gameState.isDealing)
+                // TEMPORARILY REMOVED .disabled() to test if this is blocking clicks
+                // .disabled(gameState.isDealing)
+                .allowsHitTesting(true) // Explicitly enable hit testing
             }
             
             
